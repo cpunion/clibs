@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 
 var (
 	baseBranch string
+	verbose    bool
 )
 
 // changesCmd represents the changes command
@@ -27,38 +29,101 @@ var changesCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Get the base commit to compare against
-		baseCommit := baseBranch
-		if baseCommit == "" {
-			// Default to HEAD^ if no base branch specified
-			baseCommit = "HEAD^"
+		// Set default base branch if not specified
+		fromRef := baseBranch
+		if fromRef == "" {
+			// Default to HEAD~1 if no base branch specified
+			fromRef = "HEAD~1"
 		}
+		toRef := "HEAD"
 
-		// Get changed files
-		changedFiles, err := getChangedFiles(repoRoot, baseCommit)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		// Path to the detection script
+		scriptPath := filepath.Join(repoRoot, ".github", "scripts", "detect-changes.sh")
+
+		// Check if the script exists
+		if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Error: Detection script not found at %s\n", scriptPath)
+			fmt.Fprintf(os.Stderr, "Please ensure the repository is properly set up with CI scripts\n")
 			os.Exit(1)
 		}
 
-		// Find changed directories with pkg.yaml
-		changedDirs := findChangedDirs(repoRoot, changedFiles)
+		// Make sure the script is executable
+		if err := os.Chmod(scriptPath, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Could not make script executable: %v\n", err)
+		}
 
-		// Output the changed packages
-		if len(changedDirs) > 0 {
-			fmt.Println("Changed packages that need rebuilding:")
-			for _, dir := range changedDirs {
-				fmt.Printf("github.com/goplus/clibs/%s\n", dir)
+		// Create a pipe to capture the script output
+		cmd2 := exec.Command(scriptPath, fromRef, toRef)
+		cmd2.Dir = repoRoot
+
+		// If verbose, show all output
+		if verbose {
+			cmd2.Stdout = os.Stdout
+			cmd2.Stderr = os.Stderr
+
+			if err := cmd2.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error running detection script: %v\n", err)
+				os.Exit(1)
 			}
 		} else {
-			fmt.Println("No package changes detected.")
+			// Otherwise, capture and parse the output
+			stdout, err := cmd2.StdoutPipe()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error creating stdout pipe: %v\n", err)
+				os.Exit(1)
+			}
+
+			cmd2.Stderr = os.Stderr
+
+			if err := cmd2.Start(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error starting detection script: %v\n", err)
+				os.Exit(1)
+			}
+
+			// Parse the output to get changed directories
+			var changedDirs []string
+			hasChanges := false
+
+			scanner := bufio.NewScanner(stdout)
+			for scanner.Scan() {
+				line := scanner.Text()
+
+				if strings.HasPrefix(line, "CHANGED_DIRS=") {
+					dirStr := strings.TrimPrefix(line, "CHANGED_DIRS=")
+					if dirStr != "" {
+						changedDirs = strings.Fields(dirStr)
+					}
+				} else if line == "has_changes=true" {
+					hasChanges = true
+				}
+			}
+
+			if err := scanner.Err(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error reading script output: %v\n", err)
+			}
+
+			if err := cmd2.Wait(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error running detection script: %v\n", err)
+				os.Exit(1)
+			}
+
+			// Display results
+			if hasChanges {
+				fmt.Println("Changed packages that need rebuilding:")
+				for _, dir := range changedDirs {
+					fmt.Printf("github.com/goplus/clibs/%s\n", dir)
+				}
+			} else {
+				fmt.Println("No package changes detected.")
+			}
 		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(changesCmd)
-	changesCmd.Flags().StringVarP(&baseBranch, "base", "b", "", "Base branch or commit to compare against (default: HEAD^)")
+	changesCmd.Flags().StringVarP(&baseBranch, "base", "b", "", "Base branch or commit to compare against (default: HEAD~1)")
+	changesCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show verbose output from the detection script")
 }
 
 // getRepoRoot returns the root directory of the git repository
@@ -69,57 +134,4 @@ func getRepoRoot() (string, error) {
 		return "", fmt.Errorf("failed to get repository root: %v", err)
 	}
 	return strings.TrimSpace(string(output)), nil
-}
-
-// getChangedFiles returns a list of files that have changed compared to the base commit
-func getChangedFiles(repoRoot, baseCommit string) ([]string, error) {
-	cmd := exec.Command("git", "diff", "--name-only", baseCommit)
-	cmd.Dir = repoRoot
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get changed files: %v", err)
-	}
-	
-	if len(output) == 0 {
-		return []string{}, nil
-	}
-	
-	return strings.Split(strings.TrimSpace(string(output)), "\n"), nil
-}
-
-// findChangedDirs identifies directories that have pkg.yaml files and have changes
-func findChangedDirs(repoRoot string, changedFiles []string) []string {
-	dirMap := make(map[string]bool)
-	
-	for _, file := range changedFiles {
-		// Get the top-level directory
-		parts := strings.SplitN(file, "/", 2)
-		if len(parts) < 2 {
-			continue
-		}
-		
-		dir := parts[0]
-		
-		// Skip dot directories and build directory
-		if strings.HasPrefix(dir, ".") || dir == "build" {
-			continue
-		}
-		
-		// Check if this directory has a pkg.yaml file
-		pkgYamlPath := filepath.Join(repoRoot, dir, "pkg.yaml")
-		if _, err := os.Stat(pkgYamlPath); err == nil {
-			// Either pkg.yaml itself changed or another file in the directory changed
-			if file == filepath.Join(dir, "pkg.yaml") || strings.HasPrefix(file, dir+"/") {
-				dirMap[dir] = true
-			}
-		}
-	}
-	
-	// Convert map to slice
-	var result []string
-	for dir := range dirMap {
-		result = append(result, dir)
-	}
-	
-	return result
 }
