@@ -15,12 +15,17 @@ jobs:
         with:
           fetch-depth: 0 # Fetch all history for comparing changes
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.24
+
+      - name: Install llgo_clibs
+        working-directory: build
+        run: go install ./cmd/llgo_clibs
+
       - name: Detect changed directories with pkg.yaml
         id: detect-changes
         run: |
-          # Make script executable
-          chmod +x .github/scripts/detect-changes.sh
-          
           # Determine the appropriate refs based on event type
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             # For pull requests, compare the PR base to the PR head
@@ -31,7 +36,7 @@ jobs:
             FROM_REF="${{ github.event.before }}"
             TO_REF="${{ github.event.after }}"
           fi
-          
+
           # Run the detection script
           .github/scripts/detect-changes.sh "$FROM_REF" "$TO_REF"
 
@@ -40,5 +45,6 @@ jobs:
         run: |
           echo "The following directories have changes and need to be rebuilt:"
           for dir in ${{ steps.detect-changes.outputs.CHANGED_DIRS }}; do
-            echo "- $dir"
+            cd "$dir"
+            llgo_clibs prebuild .
           done
