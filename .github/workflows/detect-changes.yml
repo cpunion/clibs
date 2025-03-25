@@ -40,11 +40,13 @@ jobs:
           # Run the detection script
           .github/scripts/detect-changes.sh "$FROM_REF" "$TO_REF"
 
-      - name: Display changed directories
+      - name: Rebuild changed packages
         if: steps.detect-changes.outputs.has_changes == 'true'
         run: |
           echo "The following directories have changes and need to be rebuilt:"
+          REPO_ROOT="$(pwd)"
           for dir in ${{ steps.detect-changes.outputs.CHANGED_DIRS }}; do
-            cd "$dir"
+            echo "- Rebuilding $dir"
+            cd "$REPO_ROOT/$dir"
             llgo_clibs prebuild
           done
