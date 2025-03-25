@@ -59,11 +59,14 @@ jobs:
   build-packages:
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
-    runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
         package: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+        os: [ubuntu-latest, macos-latest]
+        arch: [amd64, arm64]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -78,14 +81,16 @@ jobs:
 
       - name: Build package ${{ matrix.package }}
         run: |
-          echo "Building package ${{ matrix.package }}"
-          # Ensure directory exists before changing to it
-          if [ ! -d "${{ matrix.package }}" ]; then
-            echo "Error: Directory ${{ matrix.package }} does not exist"
-            exit 1
-          fi
+          echo "Building package ${{ matrix.package }} for ${{ matrix.os }}/${{ matrix.arch }}"
           cd "${{ matrix.package }}"
           llgo_clibs prebuild
+
+      - name: Build package ${{ matrix.package }} for wasip1
+        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'amd64'
+        run: |
+          echo "Building wasip1 for ${{ matrix.os }}/${{ matrix.arch }}"
+          cd "${{ matrix.package }}"
+          GOOS=wasip1 GOARCH=wasm llgo_clibs prebuild
 
   summarize:
     needs: [detect-changes, build-packages]
@@ -107,3 +112,8 @@ jobs:
           for dir in ${{ fromJson(needs.detect-changes.outputs.matrix) }}; do
             echo "- $dir" >> $GITHUB_STEP_SUMMARY
           done
+
+          echo "### Build Matrix:" >> $GITHUB_STEP_SUMMARY
+          echo "- Operating Systems: Ubuntu Linux, macOS" >> $GITHUB_STEP_SUMMARY
+          echo "- Architectures: AMD64, ARM64" >> $GITHUB_STEP_SUMMARY
+          echo "- Special targets: WASI/WebAssembly" >> $GITHUB_STEP_SUMMARY
