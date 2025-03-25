@@ -13,6 +13,11 @@ on:
         default: true
         type: boolean
 
+# Add permissions needed for creating releases
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   detect-changes:
     runs-on: ubuntu-latest
