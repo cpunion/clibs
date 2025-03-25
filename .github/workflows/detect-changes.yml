@@ -46,5 +46,5 @@ jobs:
           echo "The following directories have changes and need to be rebuilt:"
           for dir in ${{ steps.detect-changes.outputs.CHANGED_DIRS }}; do
             cd "$dir"
-            llgo_clibs prebuild .
+            llgo_clibs prebuild
           done

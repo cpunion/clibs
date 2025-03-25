@@ -83,6 +83,8 @@ func getBuildEnv(modLocalPath, buildDir, platform, arch string) []string {
 	// 生成构建标志
 	cflags, ldflags := getBuildFlags(targetTriple)
 
+	downloadDir := GetDownloadDir(modLocalPath)
+
 	// 创建环境变量
 	env := os.Environ()
 	env = append(env,
@@ -91,6 +93,7 @@ func getBuildEnv(modLocalPath, buildDir, platform, arch string) []string {
 		fmt.Sprintf("CLIBS_BUILD_CFLAGS=%s", cflags),
 		fmt.Sprintf("CLIBS_BUILD_LDFLAGS=%s", ldflags),
 		fmt.Sprintf("CLIBS_BUILD_DIR=%s", buildDir),
+		fmt.Sprintf("CLIBS_DOWNLOAD_DIR=%s", downloadDir),
 	)
 
 	return env

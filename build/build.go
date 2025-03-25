@@ -15,20 +15,12 @@ import (
 func GetClibPkgs(pkgs ...string) ([]Package, error) {
 	var packages []Package
 
-	// 获取当前模块名称
-	cmd := exec.Command("go", "list", "-m")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current module: %v", err)
-	}
-	currentModule := strings.TrimSpace(string(output))
-
 	// 获取项目依赖的所有模块或指定的模块
 	var modules []string
 	if len(pkgs) == 0 {
 		// 获取所有模块
-		cmd = exec.Command("go", "list", "-m", "all")
-		output, err = cmd.Output()
+		cmd := exec.Command("go", "list", "-m", "all")
+		output, err := cmd.Output()
 		if err != nil {
 			return nil, fmt.Errorf("failed to list modules: %v", err)
 		}
@@ -37,8 +29,8 @@ func GetClibPkgs(pkgs ...string) ([]Package, error) {
 		// 获取指定的模块
 		fmt.Printf("Executing: go list -m %s\n", strings.Join(pkgs, " "))
 		args := append([]string{"list", "-m"}, pkgs...)
-		cmd = exec.Command("go", args...)
-		output, err = cmd.Output()
+		cmd := exec.Command("go", args...)
+		output, err := cmd.Output()
 		if err != nil {
 			return nil, fmt.Errorf("failed to list specified modules: %v", err)
 		}
@@ -57,13 +49,8 @@ func GetClibPkgs(pkgs ...string) ([]Package, error) {
 			modPath = strings.TrimSpace(mod[:idx])
 		}
 
-		// 跳过主模块
-		if modPath == currentModule {
-			continue
-		}
-
 		// 获取模块本地路径
-		cmd = exec.Command("go", "list", "-m", "-f", "{{.Dir}}", modPath)
+		cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", modPath)
 		modOutput, err := cmd.Output()
 		if err != nil {
 			fmt.Printf("- %s: Error finding local path: %v\n", modPath, err)
