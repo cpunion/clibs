@@ -1,0 +1,80 @@
+name: Detect Package Changes
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Fetch all history for comparing changes
+
+      - name: Detect changed directories with pkg.yaml
+        id: detect-changes
+        run: |
+          # Get the base commit to compare against
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_COMMIT=${{ github.event.pull_request.base.sha }}
+          else
+            BASE_COMMIT=$(git rev-parse HEAD^)
+          fi
+
+          echo "Comparing changes against $BASE_COMMIT"
+
+          # Find all changed files
+          CHANGED_FILES=$(git diff --name-only $BASE_COMMIT HEAD)
+
+          # Initialize array to store changed directories with pkg.yaml
+          CHANGED_DIRS=()
+
+          # Check each changed file
+          echo "$CHANGED_FILES" | while read -r file; do
+            # Get the directory of the changed file (first level subdirectory)
+            DIR=$(echo "$file" | cut -d'/' -f1)
+
+            # Skip if it's not a direct subdirectory or if it's a dot directory
+            if [[ "$DIR" == */* ]] || [[ "$DIR" == .* ]]; then
+              continue
+            fi
+
+            # Check if this directory has a pkg.yaml file
+            if [[ -f "$DIR/pkg.yaml" ]]; then
+              # Check if pkg.yaml itself changed or any file in this directory changed
+              if echo "$CHANGED_FILES" | grep -q "^$DIR/pkg.yaml$" || echo "$CHANGED_FILES" | grep -q "^$DIR/"; then
+                # Add to the list if not already there
+                if [[ ! " ${CHANGED_DIRS[@]} " =~ " $DIR " ]]; then
+                  CHANGED_DIRS+=("$DIR")
+                fi
+              fi
+            fi
+          done
+
+          # Output the changed directories
+          echo "Changed directories with pkg.yaml:"
+          for dir in "${CHANGED_DIRS[@]}"; do
+            echo "github.com/goplus/clibs/$dir"
+          done
+
+          # Set output for other steps
+          if [ ${#CHANGED_DIRS[@]} -gt 0 ]; then
+            echo "changed_packages<<EOF" >> $GITHUB_OUTPUT
+            for dir in "${CHANGED_DIRS[@]}"; do
+              echo "github.com/goplus/clibs/$dir" >> $GITHUB_OUTPUT
+            done
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Display changed packages
+        if: steps.detect-changes.outputs.has_changes == 'true'
+        run: |
+          echo "The following packages have changes and need to be rebuilt:"
+          echo "${{ steps.detect-changes.outputs.changed_packages }}"
