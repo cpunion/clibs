@@ -12,6 +12,7 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       has_changes: ${{ steps.detect-changes.outputs.has_changes }}
+      package_versions: ${{ steps.get-versions.outputs.package_versions }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -47,6 +48,24 @@ jobs:
           JSON_ARRAY=$(echo "$DIRS_CLEAN" | jq -R -c 'split(" ")')
           echo "matrix=$JSON_ARRAY" >> $GITHUB_OUTPUT
           echo "Generated matrix: $JSON_ARRAY"
+
+      - name: Get package versions
+        id: get-versions
+        if: steps.detect-changes.outputs.has_changes == 'true'
+        run: |
+          # Extract package versions from pkg.yaml files
+          VERSIONS="{}"
+          for dir in ${{ steps.detect-changes.outputs.CHANGED_DIRS }}; do
+            if [ -f "$dir/pkg.yaml" ]; then
+              VERSION=$(grep -E "^version:" "$dir/pkg.yaml" | awk '{print $2}' | tr -d '"' | tr -d "'")
+              if [ -n "$VERSION" ]; then
+                PACKAGE_NAME=$(basename "$dir")
+                VERSIONS=$(echo "$VERSIONS" | jq --arg pkg "$dir" --arg ver "$VERSION" '. + {($pkg): $ver}')
+              fi
+            fi
+          done
+          echo "package_versions=$VERSIONS" >> $GITHUB_OUTPUT
+          echo "Package versions: $VERSIONS"
 
       - name: List changed directories
         if: steps.detect-changes.outputs.has_changes == 'true'
@@ -92,8 +111,105 @@ jobs:
           cd "${{ matrix.package }}"
           GOOS=wasip1 GOARCH=wasm llgo_clibs prebuild
 
-  summarize:
+      - name: Get package version
+        id: get-package-version
+        run: |
+          PACKAGE_VERSIONS='${{ needs.detect-changes.outputs.package_versions }}'
+          VERSION=$(echo "$PACKAGE_VERSIONS" | jq -r --arg pkg "${{ matrix.package }}" '.[$pkg]')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Package ${{ matrix.package }} version: $VERSION"
+
+      - name: Package artifacts
+        run: |
+          PACKAGE_NAME=$(basename "${{ matrix.package }}")
+          VERSION="${{ steps.get-package-version.outputs.version }}"
+
+          # Make the packaging script executable
+          chmod +x .github/scripts/package.sh
+
+          # Create artifacts directory
+          mkdir -p /tmp/artifacts
+
+          # Check if _prebuilt directory exists
+          if [ -d "${{ matrix.package }}/_prebuilt" ]; then
+            cd "${{ matrix.package }}"
+            ../.github/scripts/package.sh _prebuilt /tmp/artifacts "$PACKAGE_NAME" "$VERSION"
+          else
+            echo "No _prebuilt directory found in ${{ matrix.package }}"
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.package }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: /tmp/artifacts/*.tar.gz
+          if-no-files-found: ignore
+
+  create-release:
     needs: [detect-changes, build-packages]
+    if: always() && needs.detect-changes.outputs.has_changes == 'true' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p ./release-assets
+          find ./artifacts -type f -name "*.tar.gz" -exec cp {} ./release-assets/ \;
+          ls -la ./release-assets/
+
+      - name: Create releases for each package
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PACKAGE_VERSIONS='${{ needs.detect-changes.outputs.package_versions }}'
+          echo "$PACKAGE_VERSIONS" | jq -r 'to_entries[] | "\(.key) \(.value)"' | while read pkg version; do
+            PACKAGE_NAME=$(basename "$pkg")
+            RELEASE_NAME="${PACKAGE_NAME}/${version}"
+            RELEASE_TAG="${PACKAGE_NAME}-v${version}"
+
+            echo "Creating release $RELEASE_NAME with tag $RELEASE_TAG"
+
+            # Create a release
+            release_response=$(curl -s -X POST \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -d "{\"tag_name\":\"$RELEASE_TAG\",\"name\":\"$RELEASE_NAME\",\"body\":\"Prebuilt binaries for $PACKAGE_NAME version $version\",\"draft\":false,\"prerelease\":false}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases")
+
+            release_id=$(echo "$release_response" | jq -r '.id')
+
+            if [[ "$release_id" == "null" ]]; then
+              echo "Failed to create release: $release_response"
+              continue
+            fi
+
+            echo "Created release with ID: $release_id"
+
+            # Upload assets for this package
+            for asset in ./release-assets/${PACKAGE_NAME}-${version}-*.tar.gz; do
+              if [ -f "$asset" ]; then
+                asset_name=$(basename "$asset")
+                echo "Uploading asset: $asset_name"
+
+                curl -s -X POST \
+                  -H "Authorization: token $GITHUB_TOKEN" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  -H "Content-Type: application/gzip" \
+                  --data-binary @"$asset" \
+                  "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=$asset_name"
+              fi
+            done
+          done
+
+  summarize:
+    needs: [detect-changes, build-packages, create-release]
     if: always() && needs.detect-changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -117,3 +233,8 @@ jobs:
           echo "- Operating Systems: Ubuntu Linux, macOS" >> $GITHUB_STEP_SUMMARY
           echo "- Architectures: AMD64, ARM64" >> $GITHUB_STEP_SUMMARY
           echo "- Special targets: WASI/WebAssembly" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "### Releases:" >> $GITHUB_STEP_SUMMARY
+            echo "Releases were created for each package with prebuilt binaries as assets." >> $GITHUB_STEP_SUMMARY
+          fi
