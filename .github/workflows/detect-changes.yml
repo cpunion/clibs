@@ -120,6 +120,7 @@ jobs:
           echo "Package ${{ matrix.package }} version: $VERSION"
 
       - name: Package artifacts
+        id: package-artifacts
         run: |
           PACKAGE_NAME=$(basename "${{ matrix.package }}")
           VERSION="${{ steps.get-package-version.outputs.version }}"
@@ -138,11 +139,15 @@ jobs:
             echo "No _prebuilt directory found in ${{ matrix.package }}"
           fi
 
+          # Create metadata file with package info
+          echo "PACKAGE_NAME=$PACKAGE_NAME" > /tmp/artifacts/package_info.txt
+          echo "VERSION=$VERSION" >> /tmp/artifacts/package_info.txt
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.package }}-${{ matrix.os }}-${{ matrix.arch }}
-          path: /tmp/artifacts/*.tar.gz
+          path: /tmp/artifacts/
           if-no-files-found: ignore
 
   create-release:
@@ -168,13 +173,37 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get unique package names from artifact filenames
-          PACKAGES=$(find ./release-assets -type f -name "*.tar.gz" | sed -E 's|.*/([^-]+)-.*|\1|' | sort -u)
+          # Create a mapping of package names to versions
+          declare -A package_versions
 
-          for PACKAGE_NAME in $PACKAGES; do
-            # Get version from first matching artifact
-            VERSION_FILE=$(find ./release-assets -type f -name "${PACKAGE_NAME}-*.tar.gz" | head -1)
-            VERSION=$(echo "$VERSION_FILE" | sed -E "s|.*/[^-]+-([^-]+)-.*|\1|")
+          # Extract package info from metadata files without using a pipe (to avoid subshell)
+          while read -r info_file; do
+            # Process each metadata file
+            current_package=""
+            current_version=""
+
+            while IFS= read -r line; do
+              if [[ "$line" == PACKAGE_NAME=* ]]; then
+                current_package="${line#PACKAGE_NAME=}"
+              elif [[ "$line" == VERSION=* ]]; then
+                current_version="${line#VERSION=}"
+              fi
+            done < "$info_file"
+
+            if [[ -n "$current_package" && -n "$current_version" ]]; then
+              package_versions["$current_package"]="$current_version"
+              echo "Found package: $current_package, version: $current_version"
+            fi
+          done < <(find ./artifacts -name "package_info.txt")
+
+          echo "Package versions map:"
+          for pkg in "${!package_versions[@]}"; do
+            echo "  $pkg: ${package_versions[$pkg]}"
+          done
+
+          # Process each unique package
+          for PACKAGE_NAME in "${!package_versions[@]}"; do
+            VERSION="${package_versions[$PACKAGE_NAME]}"
 
             if [ -z "$VERSION" ] || [ "$VERSION" == "unknown" ]; then
               echo "Skipping release for $PACKAGE_NAME with unknown version"
@@ -273,6 +302,7 @@ jobs:
             echo "Created release with ID: $release_id"
 
             # Upload assets for this package
+            echo "Looking for assets matching: ./release-assets/${PACKAGE_NAME}-${VERSION}-*.tar.gz"
             for asset in ./release-assets/${PACKAGE_NAME}-${VERSION}-*.tar.gz; do
               if [ -f "$asset" ]; then
                 asset_name=$(basename "$asset")
@@ -284,6 +314,8 @@ jobs:
                   -H "Content-Type: application/gzip" \
                   --data-binary @"$asset" \
                   "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=$asset_name"
+              else
+                echo "No matching assets found for pattern: ./release-assets/${PACKAGE_NAME}-${VERSION}-*.tar.gz"
               fi
             done
           done
