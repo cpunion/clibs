@@ -9,19 +9,14 @@ on:
 jobs:
   detect-changes:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has_changes: ${{ steps.detect-changes.outputs.has_changes }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0 # Fetch all history for comparing changes
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: 1.24
-
-      - name: Install llgo_clibs
-        working-directory: build
-        run: go install ./cmd/llgo_clibs
 
       - name: Detect changed directories with pkg.yaml
         id: detect-changes
@@ -38,15 +33,77 @@ jobs:
           fi
 
           # Run the detection script
+          chmod +x .github/scripts/detect-changes.sh
           .github/scripts/detect-changes.sh "$FROM_REF" "$TO_REF"
 
-      - name: Rebuild changed packages
+      - name: Set matrix
+        id: set-matrix
+        if: steps.detect-changes.outputs.has_changes == 'true'
+        run: |
+          # Create a JSON array from the space-separated list
+          DIRS="${{ steps.detect-changes.outputs.CHANGED_DIRS }}"
+          # Clean up any newlines and create a proper JSON array
+          DIRS_CLEAN=$(echo "$DIRS" | tr '\n' ' ' | xargs)
+          JSON_ARRAY=$(echo "$DIRS_CLEAN" | jq -R -c 'split(" ")')
+          echo "matrix=$JSON_ARRAY" >> $GITHUB_OUTPUT
+          echo "Generated matrix: $JSON_ARRAY"
+
+      - name: List changed directories
         if: steps.detect-changes.outputs.has_changes == 'true'
         run: |
           echo "The following directories have changes and need to be rebuilt:"
-          REPO_ROOT="$(pwd)"
           for dir in ${{ steps.detect-changes.outputs.CHANGED_DIRS }}; do
-            echo "- Rebuilding $dir"
-            cd "$REPO_ROOT/$dir"
-            llgo_clibs prebuild
+            echo "- $dir"
+          done
+
+  build-packages:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.24
+
+      - name: Install llgo_clibs
+        working-directory: build
+        run: go install ./cmd/llgo_clibs
+
+      - name: Build package ${{ matrix.package }}
+        run: |
+          echo "Building package ${{ matrix.package }}"
+          # Ensure directory exists before changing to it
+          if [ ! -d "${{ matrix.package }}" ]; then
+            echo "Error: Directory ${{ matrix.package }} does not exist"
+            exit 1
+          fi
+          cd "${{ matrix.package }}"
+          llgo_clibs prebuild
+
+  summarize:
+    needs: [detect-changes, build-packages]
+    if: always() && needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize build results
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Build status: ${{ needs.build-packages.result }}" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.build-packages.result }}" == "success" ]]; then
+            echo " All packages built successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo " Some packages failed to build" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "### Changed packages:" >> $GITHUB_STEP_SUMMARY
+          for dir in ${{ fromJson(needs.detect-changes.outputs.matrix) }}; do
+            echo "- $dir" >> $GITHUB_STEP_SUMMARY
           done
