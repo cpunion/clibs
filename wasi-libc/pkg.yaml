@@ -4,4 +4,6 @@ files:
 
 build:
   command: |
-    cp $CLIBS_DOWNLOAD_DIR/libclang_rt.builtins-wasm32-wasi-25.0/* $CLIBS_BUILD_DIR
+    if [ "$CLIBS_BUILD_GOARCH" = "wasm" ]; then
+      cp $CLIBS_DOWNLOAD_DIR/libclang_rt.builtins-wasm32-wasi-25.0/* $CLIBS_BUILD_DIR
+    fi
