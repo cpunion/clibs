@@ -1,0 +1,11 @@
+version: 8.2.8
+git:
+  repo: https://github.com/ivmai/bdwgc.git
+  ref: v8.2.8
+build:
+  command: |
+    mkdir -p out
+    cd out
+    cmake -Dbuild_tests=OFF -DCMAKE_INSTALL_PREFIX=$CLIBS_BUILD_DIR ..
+    cmake --build .
+    cmake --install .

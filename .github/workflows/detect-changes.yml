@@ -5,10 +5,25 @@ on:
     branches: [main, master]
   push:
     branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      force-recreate-release:
+        description: "Force recreate releases even if they already exist"
+        required: false
+        default: true
+        type: boolean
+
+# Add permissions needed for creating releases
+permissions:
+  contents: write
+  packages: write
 
 jobs:
   detect-changes:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has_changes: ${{ steps.detect-changes.outputs.has_changes }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -18,63 +33,320 @@ jobs:
       - name: Detect changed directories with pkg.yaml
         id: detect-changes
         run: |
-          # Get the base commit to compare against
+          # Determine the appropriate refs based on event type
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE_COMMIT=${{ github.event.pull_request.base.sha }}
+            # For pull requests, compare the PR base to the PR head
+            FROM_REF="${{ github.event.pull_request.base.sha }}"
+            TO_REF="${{ github.event.pull_request.head.sha }}"
           else
-            BASE_COMMIT=$(git rev-parse HEAD^)
+            # For pushes, use the before and after commit SHAs
+            FROM_REF="${{ github.event.before }}"
+            TO_REF="${{ github.event.after }}"
           fi
 
-          echo "Comparing changes against $BASE_COMMIT"
+          # Run the detection script
+          chmod +x .github/scripts/detect-changes.sh
+          .github/scripts/detect-changes.sh "$FROM_REF" "$TO_REF"
 
-          # Find all changed files
-          CHANGED_FILES=$(git diff --name-only $BASE_COMMIT HEAD)
+      - name: Set matrix
+        id: set-matrix
+        if: steps.detect-changes.outputs.has_changes == 'true'
+        run: |
+          # Create a JSON array from the space-separated list
+          DIRS="${{ steps.detect-changes.outputs.CHANGED_DIRS }}"
+          # Clean up any newlines and create a proper JSON array
+          DIRS_CLEAN=$(echo "$DIRS" | tr '\n' ' ' | xargs)
+          JSON_ARRAY=$(echo "$DIRS_CLEAN" | jq -R -c 'split(" ")')
+          echo "matrix=$JSON_ARRAY" >> $GITHUB_OUTPUT
+          echo "Generated matrix: $JSON_ARRAY"
 
-          # Initialize array to store changed directories with pkg.yaml
-          CHANGED_DIRS=()
+      - name: List changed directories
+        if: steps.detect-changes.outputs.has_changes == 'true'
+        run: |
+          echo "The following directories have changes and need to be rebuilt:"
+          for dir in ${{ steps.detect-changes.outputs.CHANGED_DIRS }}; do
+            echo "- $dir"
+          done
 
-          # Check each changed file
-          echo "$CHANGED_FILES" | while read -r file; do
-            # Get the directory of the changed file (first level subdirectory)
-            DIR=$(echo "$file" | cut -d'/' -f1)
+  build-packages:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+        os: [ubuntu-latest, macos-latest]
+        arch: [amd64, arm64]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-            # Skip if it's not a direct subdirectory or if it's a dot directory
-            if [[ "$DIR" == */* ]] || [[ "$DIR" == .* ]]; then
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.24
+
+      - name: Install llgo_clibs
+        working-directory: build
+        run: go install ./cmd/llgo_clibs
+
+      - name: Build package ${{ matrix.package }}
+        run: |
+          echo "Building package ${{ matrix.package }} for ${{ matrix.os }}/${{ matrix.arch }}"
+          cd "${{ matrix.package }}"
+          llgo_clibs prebuild
+
+      - name: Build package ${{ matrix.package }} for wasip1
+        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'amd64'
+        run: |
+          echo "Building wasip1 for ${{ matrix.os }}/${{ matrix.arch }}"
+          cd "${{ matrix.package }}"
+          GOOS=wasip1 GOARCH=wasm llgo_clibs prebuild
+
+      - name: Get package version
+        id: get-package-version
+        run: |
+          # Extract version from pkg.yaml directly
+          if [ -f "${{ matrix.package }}/pkg.yaml" ]; then
+            VERSION=$(grep -E "^version:" "${{ matrix.package }}/pkg.yaml" | awk '{print $2}' | tr -d '"' | tr -d "'")
+            if [ -z "$VERSION" ]; then
+              VERSION="unknown"
+            fi
+          else
+            VERSION="unknown"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Package ${{ matrix.package }} version: $VERSION"
+
+      - name: Package artifacts
+        id: package-artifacts
+        run: |
+          PACKAGE_NAME=$(basename "${{ matrix.package }}")
+          VERSION="${{ steps.get-package-version.outputs.version }}"
+
+          # Make the packaging script executable
+          chmod +x .github/scripts/package.sh
+
+          # Create artifacts directory
+          mkdir -p /tmp/artifacts
+
+          # Check if _prebuilt directory exists
+          if [ -d "${{ matrix.package }}/_prebuilt" ]; then
+            cd "${{ matrix.package }}"
+            ../.github/scripts/package.sh _prebuilt /tmp/artifacts "$PACKAGE_NAME" "$VERSION"
+          else
+            echo "No _prebuilt directory found in ${{ matrix.package }}"
+          fi
+
+          # Create metadata file with package info
+          echo "PACKAGE_NAME=$PACKAGE_NAME" > /tmp/artifacts/package_info.txt
+          echo "VERSION=$VERSION" >> /tmp/artifacts/package_info.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.package }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: /tmp/artifacts/
+          if-no-files-found: ignore
+
+  create-release:
+    needs: [detect-changes, build-packages]
+    if: always() && needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p ./release-assets
+          find ./artifacts -type f -name "*.tar.gz" -exec cp {} ./release-assets/ \;
+          ls -la ./release-assets/
+
+      - name: Create releases for each package
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create a mapping of package names to versions
+          declare -A package_versions
+
+          # Extract package info from metadata files without using a pipe (to avoid subshell)
+          while read -r info_file; do
+            # Process each metadata file
+            current_package=""
+            current_version=""
+
+            while IFS= read -r line; do
+              if [[ "$line" == PACKAGE_NAME=* ]]; then
+                current_package="${line#PACKAGE_NAME=}"
+              elif [[ "$line" == VERSION=* ]]; then
+                current_version="${line#VERSION=}"
+              fi
+            done < "$info_file"
+
+            if [[ -n "$current_package" && -n "$current_version" ]]; then
+              package_versions["$current_package"]="$current_version"
+              echo "Found package: $current_package, version: $current_version"
+            fi
+          done < <(find ./artifacts -name "package_info.txt")
+
+          echo "Package versions map:"
+          for pkg in "${!package_versions[@]}"; do
+            echo "  $pkg: ${package_versions[$pkg]}"
+          done
+
+          # Process each unique package
+          for PACKAGE_NAME in "${!package_versions[@]}"; do
+            VERSION="${package_versions[$PACKAGE_NAME]}"
+
+            if [ -z "$VERSION" ] || [ "$VERSION" == "unknown" ]; then
+              echo "Skipping release for $PACKAGE_NAME with unknown version"
               continue
             fi
 
-            # Check if this directory has a pkg.yaml file
-            if [[ -f "$DIR/pkg.yaml" ]]; then
-              # Check if pkg.yaml itself changed or any file in this directory changed
-              if echo "$CHANGED_FILES" | grep -q "^$DIR/pkg.yaml$" || echo "$CHANGED_FILES" | grep -q "^$DIR/"; then
-                # Add to the list if not already there
-                if [[ ! " ${CHANGED_DIRS[@]} " =~ " $DIR " ]]; then
-                  CHANGED_DIRS+=("$DIR")
-                fi
+            RELEASE_NAME="${PACKAGE_NAME}/${VERSION}"
+            RELEASE_TAG="${PACKAGE_NAME}-v${VERSION}"
+
+            echo "Creating release $RELEASE_NAME with tag $RELEASE_TAG"
+
+            # Check if the tag already exists
+            tag_exists=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/git/refs/tags/$RELEASE_TAG")
+
+            # Check if the release already exists
+            release_exists_response=$(curl -s \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/tags/$RELEASE_TAG")
+
+            release_id=$(echo "$release_exists_response" | jq -r '.id')
+
+            # If force-recreate-release is true, delete existing tag and release
+            if [[ "${{ github.event.inputs.force-recreate-release || 'false' }}" == "true" ]]; then
+              if [[ "$tag_exists" == "200" ]]; then
+                echo "Deleting existing tag: $RELEASE_TAG"
+                curl -s -X DELETE \
+                  -H "Authorization: token $GITHUB_TOKEN" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  "https://api.github.com/repos/${{ github.repository }}/git/refs/tags/$RELEASE_TAG"
+              fi
+
+              if [[ "$release_id" != "null" ]]; then
+                echo "Deleting existing release with ID: $release_id"
+                curl -s -X DELETE \
+                  -H "Authorization: token $GITHUB_TOKEN" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  "https://api.github.com/repos/${{ github.repository }}/releases/$release_id"
+              fi
+            elif [[ "$tag_exists" == "200" || "$release_id" != "null" ]]; then
+              echo "Release or tag already exists for $RELEASE_TAG. Skipping creation."
+
+              if [[ "$release_id" != "null" ]]; then
+                # Upload assets to existing release
+                echo "Uploading assets to existing release with ID: $release_id"
+                for asset in ./release-assets/${PACKAGE_NAME}-${VERSION}-*.tar.gz; do
+                  if [ -f "$asset" ]; then
+                    asset_name=$(basename "$asset")
+                    echo "Uploading asset: $asset_name"
+
+                    # Check if asset already exists
+                    asset_exists=$(curl -s \
+                      -H "Authorization: token $GITHUB_TOKEN" \
+                      -H "Accept: application/vnd.github.v3+json" \
+                      "https://api.github.com/repos/${{ github.repository }}/releases/$release_id/assets" | \
+                      jq -r --arg name "$asset_name" '.[] | select(.name == $name) | .id')
+
+                    if [[ -n "$asset_exists" ]]; then
+                      echo "Asset $asset_name already exists, deleting it first"
+                      curl -s -X DELETE \
+                        -H "Authorization: token $GITHUB_TOKEN" \
+                        -H "Accept: application/vnd.github.v3+json" \
+                        "https://api.github.com/repos/${{ github.repository }}/releases/assets/$asset_exists"
+                    fi
+
+                    curl -s -X POST \
+                      -H "Authorization: token $GITHUB_TOKEN" \
+                      -H "Accept: application/vnd.github.v3+json" \
+                      -H "Content-Type: application/gzip" \
+                      --data-binary @"$asset" \
+                      "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=$asset_name"
+                  fi
+                done
+
+                continue
               fi
             fi
-          done
 
-          # Output the changed directories
-          echo "Changed directories with pkg.yaml:"
-          for dir in "${CHANGED_DIRS[@]}"; do
-            echo "github.com/goplus/clibs/$dir"
-          done
+            # Create a new release
+            release_response=$(curl -s -X POST \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -d "{\"tag_name\":\"$RELEASE_TAG\",\"name\":\"$RELEASE_NAME\",\"body\":\"Prebuilt binaries for $PACKAGE_NAME version $VERSION\",\"draft\":false,\"prerelease\":false}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases")
 
-          # Set output for other steps
-          if [ ${#CHANGED_DIRS[@]} -gt 0 ]; then
-            echo "changed_packages<<EOF" >> $GITHUB_OUTPUT
-            for dir in "${CHANGED_DIRS[@]}"; do
-              echo "github.com/goplus/clibs/$dir" >> $GITHUB_OUTPUT
+            release_id=$(echo "$release_response" | jq -r '.id')
+
+            if [[ "$release_id" == "null" ]]; then
+              echo "Failed to create release: $release_response"
+              continue
+            fi
+
+            echo "Created release with ID: $release_id"
+
+            # Upload assets for this package
+            echo "Looking for assets matching: ./release-assets/${PACKAGE_NAME}-${VERSION}-*.tar.gz"
+            for asset in ./release-assets/${PACKAGE_NAME}-${VERSION}-*.tar.gz; do
+              if [ -f "$asset" ]; then
+                asset_name=$(basename "$asset")
+                echo "Uploading asset: $asset_name"
+
+                curl -s -X POST \
+                  -H "Authorization: token $GITHUB_TOKEN" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  -H "Content-Type: application/gzip" \
+                  --data-binary @"$asset" \
+                  "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=$asset_name"
+              else
+                echo "No matching assets found for pattern: ./release-assets/${PACKAGE_NAME}-${VERSION}-*.tar.gz"
+              fi
             done
-            echo "EOF" >> $GITHUB_OUTPUT
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+          done
+
+  summarize:
+    needs: [detect-changes, build-packages, create-release]
+    if: always() && needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize build results
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Build status: ${{ needs.build-packages.result }}" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.build-packages.result }}" == "success" ]]; then
+            echo " All packages built successfully" >> $GITHUB_STEP_SUMMARY
           else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo " Some packages failed to build" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: Display changed packages
-        if: steps.detect-changes.outputs.has_changes == 'true'
-        run: |
-          echo "The following packages have changes and need to be rebuilt:"
-          echo "${{ steps.detect-changes.outputs.changed_packages }}"
+          echo "### Changed packages:" >> $GITHUB_STEP_SUMMARY
+          for dir in ${{ fromJson(needs.detect-changes.outputs.matrix) }}; do
+            echo "- $dir" >> $GITHUB_STEP_SUMMARY
+          done
+
+          echo "### Build Matrix:" >> $GITHUB_STEP_SUMMARY
+          echo "- Operating Systems: Ubuntu Linux, macOS" >> $GITHUB_STEP_SUMMARY
+          echo "- Architectures: AMD64, ARM64" >> $GITHUB_STEP_SUMMARY
+          echo "- Special targets: WASI/WebAssembly" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "### Releases:" >> $GITHUB_STEP_SUMMARY
+            echo "Releases were created for each package with prebuilt binaries as assets." >> $GITHUB_STEP_SUMMARY
+          fi

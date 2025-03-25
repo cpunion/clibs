@@ -15,7 +15,16 @@ var prebuildCmd = &cobra.Command{
 	Short: "Prebuild C libraries for specified modules",
 	Long:  `Prebuild C libraries for specified Go modules based on pkg.yaml configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		err := build.Prebuild(runtime.GOOS, runtime.GOARCH, args...)
+		goos := os.Getenv("GOOS")
+		goarch := os.Getenv("GOARCH")
+		if goos == "" {
+			goos = runtime.GOOS
+		}
+		if goarch == "" {
+			goarch = runtime.GOARCH
+		}
+		fmt.Printf("Prebuild: GOOS: %s, GOARCH: %s\n", goos, goarch)
+		err := build.Prebuild(goos, goarch, args...)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)

@@ -7,6 +7,32 @@ import (
 	"strings"
 )
 
+// getBuildEnv 准备构建环境变量
+func getBuildEnv(modLocalPath, buildDir, platform, arch string) []string {
+	// 生成目标三元组
+	targetTriple := getTargetTriple(platform, arch)
+
+	// 生成构建标志
+	cflags, ldflags := getBuildFlags(targetTriple)
+
+	downloadDir := GetDownloadDir(modLocalPath)
+
+	// 创建环境变量
+	env := os.Environ()
+	env = append(env,
+		fmt.Sprintf("CLIBS_PACKAGE_DIR=%s", modLocalPath),
+		fmt.Sprintf("CLIBS_BUILD_GOOS=%s", platform),
+		fmt.Sprintf("CLIBS_BUILD_GOARCH=%s", arch),
+		fmt.Sprintf("CLIBS_BUILD_TARGET=%s", targetTriple),
+		fmt.Sprintf("CLIBS_BUILD_CFLAGS=%s", cflags),
+		fmt.Sprintf("CLIBS_BUILD_LDFLAGS=%s", ldflags),
+		fmt.Sprintf("CLIBS_BUILD_DIR=%s", buildDir),
+		fmt.Sprintf("CLIBS_DOWNLOAD_DIR=%s", downloadDir),
+	)
+
+	return env
+}
+
 // getTargetTriple 根据平台和架构生成LLVM目标三元组
 func getTargetTriple(platform, arch string) string {
 	// 平台映射
@@ -73,27 +99,6 @@ func getBuildFlags(triple string) (cflags string, ldflags string) {
 	}
 
 	return cflags, ldflags
-}
-
-// getBuildEnv 准备构建环境变量
-func getBuildEnv(modLocalPath, buildDir, platform, arch string) []string {
-	// 生成目标三元组
-	targetTriple := getTargetTriple(platform, arch)
-
-	// 生成构建标志
-	cflags, ldflags := getBuildFlags(targetTriple)
-
-	// 创建环境变量
-	env := os.Environ()
-	env = append(env,
-		fmt.Sprintf("CLIBS_PACKAGE_DIR=%s", modLocalPath),
-		fmt.Sprintf("CLIBS_BUILD_TARGET=%s", targetTriple),
-		fmt.Sprintf("CLIBS_BUILD_CFLAGS=%s", cflags),
-		fmt.Sprintf("CLIBS_BUILD_LDFLAGS=%s", ldflags),
-		fmt.Sprintf("CLIBS_BUILD_DIR=%s", buildDir),
-	)
-
-	return env
 }
 
 // buildLib builds the library using the appropriate build method
