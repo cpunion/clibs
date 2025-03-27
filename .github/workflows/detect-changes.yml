@@ -2,9 +2,9 @@ name: Detect Package Changes
 
 on:
   pull_request:
-    branches: [main, master]
+    branches: [main]
   push:
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
     inputs:
       force-recreate-release:
@@ -152,7 +152,7 @@ jobs:
 
   create-release:
     needs: [detect-changes, build-packages]
-    if: always() && needs.detect-changes.outputs.has_changes == 'true'
+    if: always() && needs.detect-changes.outputs.has_changes == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
