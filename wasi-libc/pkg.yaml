@@ -16,4 +16,5 @@ export: |
   if [ "$CLIBS_BUILD_GOARCH" = "wasm" ]; then
     echo "CFLAGS=--sysroot=$CLIBS_BUILD_DIR/sysroot"
     echo "LDFLAGS=--sysroot=$CLIBS_BUILD_DIR/sysroot"
+    echo "CLIBS_BUILD_WASI_SYSROOT=$CLIBS_BUILD_DIR/sysroot"
   fi
