@@ -45,8 +45,7 @@ jobs:
           fi
 
           # Run the detection script
-          chmod +x .github/scripts/detect-changes.sh
-          .github/scripts/detect-changes.sh "$FROM_REF" "$TO_REF"
+          python3 .github/scripts/detect-changes.py "$FROM_REF" "$TO_REF"
 
       - name: Set matrix
         id: set-matrix
