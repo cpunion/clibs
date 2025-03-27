@@ -35,7 +35,7 @@ func GetPrebuiltDir(baseDir, platform, arch string) string {
 }
 
 // checkHash 检查构建哈希是否匹配
-func checkHash(dir string, config Config, build bool) (bool, error) {
+func checkHash(dir string, config PkgSpec, build bool) (bool, error) {
 	var configHash string
 	if build {
 		configHash = config.BuildHash()
@@ -60,7 +60,7 @@ func checkHash(dir string, config Config, build bool) (bool, error) {
 	return info.ConfigHash == configHash, nil
 }
 
-func saveHash(dir string, config Config, build bool) error {
+func saveHash(dir string, config PkgSpec, build bool) error {
 	var configHash string
 	if build {
 		configHash = config.BuildHash()

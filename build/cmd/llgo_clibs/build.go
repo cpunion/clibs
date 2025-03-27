@@ -23,8 +23,26 @@ var buildCmd = &cobra.Command{
 		if goarch == "" {
 			goarch = runtime.GOARCH
 		}
-		fmt.Printf("Build: GOOS: %s, GOARCH: %s\n", goos, goarch)
-		err := build.Build(goos, goarch, args...)
+
+		// Get flag values
+		force, _ := cmd.Flags().GetBool("force")
+		prebuilt, _ := cmd.Flags().GetBool("prebuilt")
+
+		fmt.Printf("Build: GOOS: %s, GOARCH: %s, Force: %v, Prebuilt: %v\n",
+			goos, goarch, force, prebuilt)
+
+		pkgs, err := build.ListPkgs(args...)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting C library packages: %v\n", err)
+			os.Exit(1)
+		}
+		buildConfig := build.BuildConfig{
+			Goos:     goos,
+			Goarch:   goarch,
+			Force:    force,
+			Prebuilt: prebuilt,
+		}
+		err = build.Build(buildConfig, pkgs)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -34,4 +52,8 @@ var buildCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(buildCmd)
+
+	// Add flags to the build command
+	buildCmd.Flags().BoolP("force", "f", false, "Force rebuild even if already built")
+	buildCmd.Flags().BoolP("prebuilt", "p", false, "Build to prebuilt directory")
 }

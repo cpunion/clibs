@@ -95,14 +95,14 @@ jobs:
         run: |
           echo "Building package ${{ matrix.package }} for ${{ matrix.os }}/${{ matrix.arch }}"
           cd "${{ matrix.package }}"
-          llgo_clibs prebuild
+          llgo_clibs build --prebuilt
 
       - name: Build package ${{ matrix.package }} for wasip1
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'amd64'
         run: |
           echo "Building wasip1 for ${{ matrix.os }}/${{ matrix.arch }}"
           cd "${{ matrix.package }}"
-          GOOS=wasip1 GOARCH=wasm llgo_clibs prebuild
+          GOOS=wasip1 GOARCH=wasm llgo_clibs build --prebuilt
 
       - name: Get package version
         id: get-package-version

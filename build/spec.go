@@ -14,27 +14,28 @@ const (
 	ReleaseUrlPrefix = "https://api.github.com/repos/goplus/llgo/releases/tags"
 )
 
-type GitConfig struct {
+type GitSpec struct {
 	Repo string
 	Ref  string
 }
 
-type FileConfig struct {
+type FileSpec struct {
 	URL string
 }
 
-type BuildConfig struct {
+type BuildSpec struct {
 	Command string
 }
 
-type Config struct {
+type PkgSpec struct {
 	Version string
-	Git     *GitConfig
-	Files   []FileConfig
-	Build   *BuildConfig
+	Git     *GitSpec
+	Files   []FileSpec
+	Build   *BuildSpec
+	Export  string
 }
 
-func (c *Config) DownloadHash() string {
+func (c *PkgSpec) DownloadHash() string {
 	hashConfig := *c
 	hashConfig.Build = nil
 	data, err := json.Marshal(hashConfig)
@@ -44,7 +45,7 @@ func (c *Config) DownloadHash() string {
 	return md5sum(data)
 }
 
-func (c *Config) BuildHash() string {
+func (c *PkgSpec) BuildHash() string {
 	data, err := json.Marshal(*c)
 	if err != nil {
 		panic(err)
@@ -52,8 +53,18 @@ func (c *Config) BuildHash() string {
 	return md5sum(data)
 }
 
+// Package represents a package to be built
+
 type Package struct {
 	Mod    string
 	Path   string
-	Config Config
+	Config PkgSpec
+}
+
+type BuildConfig struct {
+	Goos     string
+	Goarch   string
+	Prebuilt bool
+	Force    bool
+	Verbose  bool
 }
