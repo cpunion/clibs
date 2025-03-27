@@ -13,25 +13,27 @@ const (
 )
 
 type GitSpec struct {
-	Repo string `json:"repo,omitempty"`
-	Ref  string `json:"ref,omitempty"`
+	Repo string `json:"repo,omitempty" yaml:"repo,omitempty"`
+	Ref  string `json:"ref,omitempty" yaml:"ref,omitempty"`
 }
 
 type FileSpec struct {
-	URL string `json:"url,omitempty"`
+	URL        string `json:"url,omitempty" yaml:"url,omitempty"`
+	NoExtract  bool   `json:"no-extract,omitempty" yaml:"no-extract,omitempty"`
+	ExtractDir string `json:"extract-dir,omitempty" yaml:"extract-dir,omitempty"`
 }
 
 type BuildSpec struct {
-	Command string `json:"command,omitempty"`
+	Command string `json:"command,omitempty" yaml:"command,omitempty"`
 }
 
 type PkgSpec struct {
-	Name    string     `json:"name,omitempty"`
-	Version string     `json:"version,omitempty"`
-	Git     *GitSpec   `json:"git,omitempty"`
-	Files   []FileSpec `json:"files,omitempty"`
-	Build   *BuildSpec `json:"build,omitempty"`
-	Export  string     `json:"export,omitempty"`
+	Name    string     `json:"name,omitempty" yaml:"name,omitempty"`
+	Version string     `json:"version,omitempty" yaml:"version,omitempty"`
+	Git     *GitSpec   `json:"git,omitempty" yaml:"git,omitempty"`
+	Files   []FileSpec `json:"files,omitempty" yaml:"files,omitempty"`
+	Build   *BuildSpec `json:"build,omitempty" yaml:"build,omitempty"`
+	Export  string     `json:"export,omitempty" yaml:"export,omitempty"`
 }
 
 func (c *PkgSpec) DownloadHash() PkgSpec {

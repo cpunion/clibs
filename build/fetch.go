@@ -125,6 +125,7 @@ func fetchFromGit(gitConfig *GitSpec, downloadDir string) error {
 
 // fetchFromFiles downloads files specified in the configuration
 func fetchFromFiles(files []FileSpec, downloadDir string, clean bool) error {
+	fmt.Printf("  开始下载文件: %#v\n", files)
 	// 确保下载目录存在
 	if err := os.MkdirAll(downloadDir, 0755); err != nil {
 		return fmt.Errorf("failed to create download directory: %v", err)
@@ -197,10 +198,26 @@ func fetchFromFiles(files []FileSpec, downloadDir string, clean bool) error {
 
 		fmt.Printf("  文件下载完成: %s\n", finalFilePath)
 
+		if file.NoExtract {
+			continue
+		}
+
+		var extractDir string
+		if file.ExtractDir != "" {
+			extractDir = filepath.Join(downloadDir, file.ExtractDir)
+		} else {
+			extractDir = downloadDir
+		}
+
+		fmt.Printf("  Extracting to: %s\n", extractDir)
+		if err := os.MkdirAll(extractDir, 0755); err != nil {
+			return fmt.Errorf("failed to create extract directory: %v", err)
+		}
+
 		// 解压文件（如果需要）
 		if strings.HasSuffix(filename, ".tar.gz") || strings.HasSuffix(filename, ".tgz") {
 			fmt.Printf("  正在解压: %s\n", filename)
-			cmd := exec.Command("tar", "-xzf", filename)
+			cmd := exec.Command("tar", "-xzf", filename, "-C", extractDir)
 			cmd.Dir = downloadDir
 			if output, err := cmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("extraction error: %s - %v", output, err)
@@ -209,7 +226,7 @@ func fetchFromFiles(files []FileSpec, downloadDir string, clean bool) error {
 			os.Remove(finalFilePath)
 		} else if strings.HasSuffix(filename, ".zip") {
 			fmt.Printf("  正在解压: %s\n", filename)
-			cmd := exec.Command("unzip", filename)
+			cmd := exec.Command("unzip", filename, "-d", extractDir)
 			cmd.Dir = downloadDir
 			if output, err := cmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("extraction error: %s - %v", output, err)

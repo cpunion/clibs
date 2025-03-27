@@ -80,6 +80,7 @@ func ListPkgs(pkgs ...string) ([]Package, error) {
 
 		// 检查是否存在pkg.yaml
 		pkgYamlPath := filepath.Join(modLocalPath, "pkg.yaml")
+		fmt.Printf("  Checking for pkg.yaml: %s\n", pkgYamlPath)
 		if _, err := os.Stat(pkgYamlPath); err == nil {
 			// 创建包对象
 			pkg := Package{
@@ -100,6 +101,8 @@ func ListPkgs(pkgs ...string) ([]Package, error) {
 				fmt.Printf("  Error parsing YAML %s: %v\n", modPath, err)
 				continue
 			}
+			fmt.Printf("  Found pkg.yaml: %s at %s\n", modPath, pkgYamlPath)
+			fmt.Printf("  Config: %v\n", config)
 			pkg.Config = config
 			packages = append(packages, pkg)
 		}

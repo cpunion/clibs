@@ -1,19 +1,24 @@
 name: bdwgc
 version: "v8.2.8-hotfix.1"
-git:
-  repo: https://github.com/ivmai/bdwgc.git
-  ref: v8.2.8
+
+# git:
+#   repo: https://github.com/ivmai/bdwgc.git
+#   ref: v8.2.8
+
+files:
+  - url: "https://github.com/ivmai/bdwgc/archive/refs/tags/v8.2.8.tar.gz"
+
 build:
   command: |
-    mkdir -p out
-    cd out
+    mkdir -p bdwgc-8.2.8/out
+    cd bdwgc-8.2.8/out
     if [ "$CLIBS_BUILD_GOOS" = "wasip1" ] && [ "$CLIBS_BUILD_GOARCH" = "wasm" ]; then
       # WebAssembly build configuration
       export CC=clang
       # Add necessary emulation flags and libraries for WASI
       # Disable setjmp/longjmp usage with NO_SETJMP_LIB and related flags
-      export CFLAGS="$CLIBS_BUILD_CFLAGS -fPIC --sysroot=/opt/homebrew/Cellar/wasi-libc/25/share/wasi-sysroot/ -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_MMAN -DWASI -DNO_SIGNALS -DNO_THREADS -DALL_INTERIOR_POINTERS -DGC_ATOMIC_UNCOLLECTABLE -DGC_BUILTIN_ATOMIC -DCPP_WORDSZ=32 -DALIGNMENT=4 -DOS_TYPE=\\\"WASI\\\" -Dmach_type_known -DNO_SETJMP_LIB -DNO_EMERGENCY_MALLOC -DUSE_COMPILER_TLS=0 -DNO_GETCONTEXT"
-      export LDFLAGS="$CLIBS_BUILD_LDFLAGS --sysroot=/opt/homebrew/Cellar/wasi-libc/25/share/wasi-sysroot/ -lwasi-emulated-signal -lwasi-emulated-process-clocks -lwasi-emulated-mman"
+      export CFLAGS="$CLIBS_BUILD_CFLAGS -fPIC --sysroot=$CLIBS_BUILD_WASI_SYSROOT -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_MMAN -DWASI -DNO_SIGNALS -DNO_THREADS -DALL_INTERIOR_POINTERS -DGC_ATOMIC_UNCOLLECTABLE -DGC_BUILTIN_ATOMIC -DCPP_WORDSZ=32 -DALIGNMENT=4 -DOS_TYPE=\\\"WASI\\\" -Dmach_type_known -DNO_SETJMP_LIB -DNO_EMERGENCY_MALLOC -DUSE_COMPILER_TLS=0 -DNO_GETCONTEXT"
+      export LDFLAGS="$CLIBS_BUILD_LDFLAGS --sysroot=$CLIBS_BUILD_WASI_SYSROOT -lwasi-emulated-signal -lwasi-emulated-process-clocks -lwasi-emulated-mman"
 
       # Force the target to be wasm32-unknown-wasi
       export TARGET="wasm32-unknown-wasi"
@@ -29,6 +34,7 @@ build:
             -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
             -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS" \
             -DCMAKE_MODULE_LINKER_FLAGS="$LDFLAGS" \
+            -DCMAKE_SYSROOT=$WASI_SYSROOT \
             -DBUILD_SHARED_LIBS=OFF \
             -DENABLE_THREADS=OFF \
             -DENABLE_THREAD_LOCAL_ALLOC=OFF \
