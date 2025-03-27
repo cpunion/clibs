@@ -211,7 +211,7 @@ jobs:
             fi
 
             RELEASE_NAME="${PACKAGE_NAME}/${VERSION}"
-            RELEASE_TAG="${PACKAGE_NAME}-v${VERSION}"
+            RELEASE_TAG="${PACKAGE_NAME}/${VERSION}"
 
             echo "Creating release $RELEASE_NAME with tag $RELEASE_TAG"
 
