@@ -1,4 +1,4 @@
-module github.com/goplus/clibs/build
+module github.com/cpunion/clibs/build
 
 go 1.22
 
