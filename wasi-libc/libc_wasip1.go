@@ -1,3 +1,5 @@
 package wasi_libc
 
-import _ "github.com/cpunion/clibs/librt-builtins/v25"
+const (
+	LLGoPackage = "link: -l${LLGO_BUILD_DIR}/clang_rt.builtins-wasm32"
+)

@@ -1,7 +1,5 @@
 package build
 
-import "encoding/json"
-
 // StatusFile constants for tracking library status
 const (
 	BuildDirName    = "_build"
@@ -11,46 +9,42 @@ const (
 
 	PkgConfigFile = "pkg.yaml"
 
-	ReleaseUrlPrefix = "https://api.github.com/repos/goplus/llgo/releases/tags"
+	ReleaseUrlPrefix = "https://github.com/cpunion/clibs/releases/download"
 )
 
 type GitSpec struct {
-	Repo string
-	Ref  string
+	Repo string `json:"repo,omitempty" yaml:"repo,omitempty"`
+	Ref  string `json:"ref,omitempty" yaml:"ref,omitempty"`
 }
 
 type FileSpec struct {
-	URL string
+	URL        string `json:"url,omitempty" yaml:"url,omitempty"`
+	NoExtract  bool   `json:"no-extract,omitempty" yaml:"no-extract,omitempty"`
+	ExtractDir string `json:"extract-dir,omitempty" yaml:"extract-dir,omitempty"`
 }
 
 type BuildSpec struct {
-	Command string
+	Command string `json:"command,omitempty" yaml:"command,omitempty"`
 }
 
 type PkgSpec struct {
-	Version string
-	Git     *GitSpec
-	Files   []FileSpec
-	Build   *BuildSpec
-	Export  string
+	Name    string     `json:"name,omitempty" yaml:"name,omitempty"`
+	Version string     `json:"version,omitempty" yaml:"version,omitempty"`
+	Git     *GitSpec   `json:"git,omitempty" yaml:"git,omitempty"`
+	Files   []FileSpec `json:"files,omitempty" yaml:"files,omitempty"`
+	Build   *BuildSpec `json:"build,omitempty" yaml:"build,omitempty"`
+	Export  string     `json:"export,omitempty" yaml:"export,omitempty"`
 }
 
-func (c *PkgSpec) DownloadHash() string {
+func (c *PkgSpec) DownloadHash() PkgSpec {
 	hashConfig := *c
 	hashConfig.Build = nil
-	data, err := json.Marshal(hashConfig)
-	if err != nil {
-		panic(err)
-	}
-	return md5sum(data)
+	hashConfig.Export = ""
+	return hashConfig
 }
 
-func (c *PkgSpec) BuildHash() string {
-	data, err := json.Marshal(*c)
-	if err != nil {
-		panic(err)
-	}
-	return md5sum(data)
+func (c *PkgSpec) BuildHash() PkgSpec {
+	return *c
 }
 
 // Package represents a package to be built
@@ -58,6 +52,7 @@ func (c *PkgSpec) BuildHash() string {
 type Package struct {
 	Mod    string
 	Path   string
+	Sum    string
 	Config PkgSpec
 }
 

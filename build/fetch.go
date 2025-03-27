@@ -13,7 +13,7 @@ import (
 // fetchLib fetches the library source based on the configuration
 func (p *Package) fetchLib() error {
 	// 获取下载目录
-	downloadDir := GetDownloadDir(p.Path)
+	downloadDir := GetDownloadDir(*p)
 
 	// 临时下载目录，用于保证原子性
 	downloadTmpDir := downloadDir + "_tmp"
@@ -41,7 +41,7 @@ func (p *Package) fetchLib() error {
 		fetchErr = fetchFromGit(p.Config.Git, downloadTmpDir)
 	} else if len(p.Config.Files) > 0 {
 		fmt.Printf("  Fetching from files\n")
-		fetchErr = fetchFromFiles(p.Config.Files, downloadTmpDir)
+		fetchErr = fetchFromFiles(p.Config.Files, downloadTmpDir, true)
 	} else {
 		fetchErr = fmt.Errorf("no valid fetch configuration found")
 	}
@@ -124,26 +124,29 @@ func fetchFromGit(gitConfig *GitSpec, downloadDir string) error {
 }
 
 // fetchFromFiles downloads files specified in the configuration
-func fetchFromFiles(files []FileSpec, downloadDir string) error {
+func fetchFromFiles(files []FileSpec, downloadDir string, clean bool) error {
+	fmt.Printf("  开始下载文件: %#v\n", files)
 	// 确保下载目录存在
 	if err := os.MkdirAll(downloadDir, 0755); err != nil {
 		return fmt.Errorf("failed to create download directory: %v", err)
 	}
 
-	// 清理下载目录，确保没有残留文件
-	dirEntries, err := os.ReadDir(downloadDir)
-	if err != nil {
-		return err
-	}
-	for _, entry := range dirEntries {
-		filePath := filepath.Join(downloadDir, entry.Name())
-		if entry.IsDir() {
-			if err := os.RemoveAll(filePath); err != nil {
-				return err
-			}
-		} else {
-			if err := os.Remove(filePath); err != nil {
-				return err
+	if clean {
+		// 清理下载目录，确保没有残留文件
+		dirEntries, err := os.ReadDir(downloadDir)
+		if err != nil {
+			return err
+		}
+		for _, entry := range dirEntries {
+			filePath := filepath.Join(downloadDir, entry.Name())
+			if entry.IsDir() {
+				if err := os.RemoveAll(filePath); err != nil {
+					return err
+				}
+			} else {
+				if err := os.Remove(filePath); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -195,10 +198,26 @@ func fetchFromFiles(files []FileSpec, downloadDir string) error {
 
 		fmt.Printf("  文件下载完成: %s\n", finalFilePath)
 
+		if file.NoExtract {
+			continue
+		}
+
+		var extractDir string
+		if file.ExtractDir != "" {
+			extractDir = filepath.Join(downloadDir, file.ExtractDir)
+		} else {
+			extractDir = downloadDir
+		}
+
+		fmt.Printf("  Extracting to: %s\n", extractDir)
+		if err := os.MkdirAll(extractDir, 0755); err != nil {
+			return fmt.Errorf("failed to create extract directory: %v", err)
+		}
+
 		// 解压文件（如果需要）
 		if strings.HasSuffix(filename, ".tar.gz") || strings.HasSuffix(filename, ".tgz") {
 			fmt.Printf("  正在解压: %s\n", filename)
-			cmd := exec.Command("tar", "-xzf", filename)
+			cmd := exec.Command("tar", "-xzf", filename, "-C", extractDir)
 			cmd.Dir = downloadDir
 			if output, err := cmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("extraction error: %s - %v", output, err)
@@ -207,7 +226,7 @@ func fetchFromFiles(files []FileSpec, downloadDir string) error {
 			os.Remove(finalFilePath)
 		} else if strings.HasSuffix(filename, ".zip") {
 			fmt.Printf("  正在解压: %s\n", filename)
-			cmd := exec.Command("unzip", filename)
+			cmd := exec.Command("unzip", filename, "-d", extractDir)
 			cmd.Dir = downloadDir
 			if output, err := cmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("extraction error: %s - %v", output, err)

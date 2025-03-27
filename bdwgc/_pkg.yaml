@@ -1,0 +1,64 @@
+name: bdwgc
+version: "v8.2.8-hotfix.1"
+
+# git:
+#   repo: https://github.com/ivmai/bdwgc.git
+#   ref: v8.2.8
+
+files:
+  - url: "https://github.com/ivmai/bdwgc/archive/refs/tags/v8.2.8.tar.gz"
+
+build:
+  command: |
+    mkdir -p bdwgc-8.2.8/out
+    cd bdwgc-8.2.8/out
+    if [ "$CLIBS_BUILD_GOOS" = "wasip1" ] && [ "$CLIBS_BUILD_GOARCH" = "wasm" ]; then
+      # WebAssembly build configuration
+      export CC=clang
+      # Add necessary emulation flags and libraries for WASI
+      # Disable setjmp/longjmp usage with NO_SETJMP_LIB and related flags
+      export CFLAGS="$CLIBS_BUILD_CFLAGS -fPIC --sysroot=$CLIBS_BUILD_WASI_SYSROOT -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_MMAN -DWASI -DNO_SIGNALS -DNO_THREADS -DALL_INTERIOR_POINTERS -DGC_ATOMIC_UNCOLLECTABLE -DGC_BUILTIN_ATOMIC -DCPP_WORDSZ=32 -DALIGNMENT=4 -DOS_TYPE=\\\"WASI\\\" -Dmach_type_known -DNO_SETJMP_LIB -DNO_EMERGENCY_MALLOC -DUSE_COMPILER_TLS=0 -DNO_GETCONTEXT"
+      export LDFLAGS="$CLIBS_BUILD_LDFLAGS --sysroot=$CLIBS_BUILD_WASI_SYSROOT -lwasi-emulated-signal -lwasi-emulated-process-clocks -lwasi-emulated-mman"
+
+      # Force the target to be wasm32-unknown-wasi
+      export TARGET="wasm32-unknown-wasi"
+
+      # Apply additional CMake options to disable features that might use setjmp
+      cmake -Dbuild_tests=OFF \
+            -DCMAKE_INSTALL_PREFIX=$CLIBS_BUILD_DIR \
+            -DCMAKE_SYSTEM_NAME=WASI \
+            -DCMAKE_SYSTEM_PROCESSOR=wasm32 \
+            -DCMAKE_C_COMPILER=$CC \
+            -DCMAKE_C_COMPILER_TARGET=$TARGET \
+            -DCMAKE_C_FLAGS="$CFLAGS" \
+            -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
+            -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS" \
+            -DCMAKE_MODULE_LINKER_FLAGS="$LDFLAGS" \
+            -DCMAKE_SYSROOT=$WASI_SYSROOT \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DENABLE_THREADS=OFF \
+            -DENABLE_THREAD_LOCAL_ALLOC=OFF \
+            -DENABLE_PARALLEL_MARK=OFF \
+            -DENABLE_DISCLAIM=OFF \
+            -DENABLE_DYNAMIC_LOADING=OFF \
+            -DENABLE_SIGRT_SIGNALS=OFF \
+            -DENABLE_GCJ_SUPPORT=OFF \
+            -DENABLE_MUNMAP=OFF \
+            -DINSTALL_HEADERS=ON \
+            -DUSE_COMPILER_TLS=OFF \
+            -DUSE_MMAP=OFF \
+            -DUSE_MUNMAP=OFF \
+            -DUSE_DLOPEN=OFF \
+            -DUSE_PROC_FOR_LIBRARIES=OFF \
+            -DUSE_GLOBAL_ALLOC=ON \
+            -DREDIRECT_MALLOC=OFF \
+            -DIGNORE_DYNAMIC_LOADING=ON \
+            -DALLOW_EXCEPTIONS=OFF \
+            ..
+    else
+      # Default build configuration for other platforms
+      cmake -Dbuild_tests=OFF -DCMAKE_INSTALL_PREFIX=$CLIBS_BUILD_DIR -DBUILD_SHARED_LIBS=OFF ..
+    fi
+    cmake --build .
+    # Use the build directory as installation target instead of system directories
+    cmake --install . --prefix $CLIBS_BUILD_DIR
