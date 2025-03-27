@@ -4,8 +4,10 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -15,23 +17,29 @@ type ConfigHashInfo struct {
 	Timestamp  int64  `json:"timestamp"`
 }
 
-func GetBuildDirByName(baseDir, dirName, platform, arch string) string {
-	return filepath.Join(baseDir, dirName, getTargetTriple(platform, arch))
-}
-
-// GetBuildDir returns the platform-specific build directory
-func GetBuildDir(baseDir, platform, arch string) string {
-	return filepath.Join(baseDir, BuildDirName, getTargetTriple(platform, arch))
+func GetBuildDirByName(pkg Package, dirName, platform, arch string) string {
+	return filepath.Join(getBuildBaseDir(pkg), dirName, getTargetTriple(platform, arch))
 }
 
 // GetDownloadDir returns the download directory
-func GetDownloadDir(baseDir string) string {
-	return filepath.Join(baseDir, DownloadDirName)
+func GetDownloadDir(pkg Package) string {
+	return filepath.Join(getBuildBaseDir(pkg), DownloadDirName)
 }
 
-// GetPrebuiltDir returns the platform-specific prebuilt directory
-func GetPrebuiltDir(baseDir, platform, arch string) string {
-	return filepath.Join(baseDir, PrebuiltDirName, getTargetTriple(platform, arch))
+func GetPrebuiltDir(pkg Package) string {
+	return filepath.Join(getBuildBaseDir(pkg), PrebuiltDirName)
+}
+
+func getBuildBaseDir(pkg Package) string {
+	if pkg.Sum == "" {
+		return pkg.Path
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+	subDir := strings.TrimLeft(pkg.Sum, "h1:")
+	return filepath.Join(home, ".llgo/", "clibs_build", pkg.Mod, subDir)
 }
 
 // checkHash 检查构建哈希是否匹配
@@ -46,6 +54,7 @@ func checkHash(dir string, config PkgSpec, build bool) (bool, error) {
 	// 检查构建哈希文件
 	hashContent, err := os.ReadFile(filepath.Join(dir, BuildHashFile))
 	if err != nil {
+		fmt.Printf("read hash file failed: %v, %s", err, filepath.Join(dir, BuildHashFile))
 		return false, err
 	}
 
@@ -53,10 +62,12 @@ func checkHash(dir string, config PkgSpec, build bool) (bool, error) {
 	var info ConfigHashInfo
 	if err := json.Unmarshal(hashContent, &info); err != nil {
 		// 如果不是有效的JSON，认为哈希不匹配
+		fmt.Printf("parse hash file failed: %v, %s", err, filepath.Join(dir, BuildHashFile))
 		return false, err
 	}
 
 	// 比较哈希值
+	fmt.Printf("  Checking hash, equal: %v, %s, %s\n", info.ConfigHash == configHash, info.ConfigHash, configHash)
 	return info.ConfigHash == configHash, nil
 }
 
@@ -80,6 +91,7 @@ func saveHash(dir string, config PkgSpec, build bool) error {
 		return err
 	}
 
+	fmt.Printf("  Saving hash: %s to %s\n", configHash, filepath.Join(dir, BuildHashFile))
 	// 写入哈希文件
 	return os.WriteFile(filepath.Join(dir, BuildHashFile), content, 0644)
 }

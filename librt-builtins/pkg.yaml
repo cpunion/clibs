@@ -1,5 +1,5 @@
 name: librt-builtins
-version: v25.0.2
+version: v25.0.3
 
 files:
   - url: https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/libclang_rt.builtins-wasm32-wasi-25.0.tar.gz

@@ -31,6 +31,7 @@ var listCmd = &cobra.Command{
 		for _, pkg := range pkgs {
 			fmt.Printf("- %s\n", pkg.Mod)
 			fmt.Printf("  Path: %s\n", pkg.Path)
+			fmt.Printf("  Sum: %s\n", pkg.Sum)
 			fmt.Printf("  Version: %s\n", pkg.Config.Version)
 			if pkg.Config.Git != nil {
 				fmt.Printf("  Git: %s@%s\n", pkg.Config.Git.Repo, pkg.Config.Git.Ref)

@@ -1,2 +1,6 @@
+github.com/cpunion/clibs/librt-builtins/v25 v25.0.2 h1:bYkTa/XlSbWtqr8ULT3RmTLGTOZnBXHX2dOI7gHgakU=
+github.com/cpunion/clibs/librt-builtins/v25 v25.0.2/go.mod h1:vj8dHBw3BJX28tY2aUC+Smxuafn5yBJhK9s39yyOguo=
+github.com/cpunion/clibs/wasi-libc/v25 v25.0.4 h1:zkTjWFpVkdyXuEI4KQyyq+dku4qrtLgKx+kSz+FjZ0E=
+github.com/cpunion/clibs/wasi-libc/v25 v25.0.4/go.mod h1:f2kAE97YGl5W6tWvurnhEVXZMLUWCZ1yJzg85wJ+qbY=
 github.com/goplus/llgo v0.10.1 h1:Cla7Rv6S67SnAknMm8nNvHhxFf9Fo/daHRcs3w3rS6s=
 github.com/goplus/llgo v0.10.1/go.mod h1:YfOHsT/g3lc9b4GclLj812YzdSsJr0kd3CCB830TqHE=

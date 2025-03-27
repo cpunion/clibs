@@ -11,7 +11,7 @@ const (
 
 	PkgConfigFile = "pkg.yaml"
 
-	ReleaseUrlPrefix = "https://api.github.com/repos/goplus/llgo/releases/tags"
+	ReleaseUrlPrefix = "https://github.com/cpunion/clibs/releases/download"
 )
 
 type GitSpec struct {
@@ -28,6 +28,7 @@ type BuildSpec struct {
 }
 
 type PkgSpec struct {
+	Name    string
 	Version string
 	Git     *GitSpec
 	Files   []FileSpec
@@ -38,11 +39,12 @@ type PkgSpec struct {
 func (c *PkgSpec) DownloadHash() string {
 	hashConfig := *c
 	hashConfig.Build = nil
+	hashConfig.Export = ""
 	data, err := json.Marshal(hashConfig)
 	if err != nil {
 		panic(err)
 	}
-	return md5sum(data)
+	return string(data)
 }
 
 func (c *PkgSpec) BuildHash() string {
@@ -50,7 +52,7 @@ func (c *PkgSpec) BuildHash() string {
 	if err != nil {
 		panic(err)
 	}
-	return md5sum(data)
+	return string(data)
 }
 
 // Package represents a package to be built
@@ -58,6 +60,7 @@ func (c *PkgSpec) BuildHash() string {
 type Package struct {
 	Mod    string
 	Path   string
+	Sum    string
 	Config PkgSpec
 }
 

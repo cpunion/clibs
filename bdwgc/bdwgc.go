@@ -19,11 +19,12 @@ package bdwgc
 import (
 	_ "unsafe"
 
+	_ "github.com/cpunion/clibs/wasi-libc/v25"
 	"github.com/goplus/llgo/c"
 )
 
 const (
-	LLGoPackage = "link: $(pkg-config --libs bdw-gc); -lgc"
+	LLGoPackage = "link: -L${LLGO_BUILD_DIR}/lib -lgc"
 )
 
 // -----------------------------------------------------------------------------

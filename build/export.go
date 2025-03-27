@@ -24,8 +24,8 @@ func (p *Package) Export(config BuildConfig) (exports [][2]string, err error) {
 		return nil, nil
 	}
 
-	buildDir := GetBuildDirByName(p.Path, BuildDirName, config.Goos, config.Goarch)
-	buildEnv := getBuildEnv(p.Path, buildDir, config.Goos, config.Goarch)
+	buildDir := GetBuildDirByName(*p, BuildDirName, config.Goos, config.Goarch)
+	buildEnv := getBuildEnv(*p, buildDir, config.Goos, config.Goarch)
 
 	// Execute the export command using bash
 	cmd := exec.Command("bash", "-c", p.Config.Export)
