@@ -1,15 +1,15 @@
 name: wasi-libc
 version: v25.0.5
 
-git:
-  repo: https://github.com/WebAssembly/wasi-libc.git
-  ref: wasi-sdk-25
+files:
+  - url: https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/libclang_rt.builtins-wasm32-wasi-25.0.tar.gz
+  - url: https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sysroot-25.0.tar.gz
 
 build:
   command: |
     if [ "$CLIBS_BUILD_GOARCH" = "wasm" ]; then
-      make THREAD_MODEL=posix
-      mv sysroot $CLIBS_BUILD_DIR/
+      cp $CLIBS_DOWNLOAD_DIR/libclang_rt.builtins-wasm32-wasi-25.0/* $CLIBS_BUILD_DIR
+      cp -a $CLIBS_DOWNLOAD_DIR/wasi-sysroot-25.0 $CLIBS_BUILD_DIR/sysroot
     fi
 
 export: |
