@@ -1,4 +1,5 @@
-version: v25.0.3
+name: wasi-libc
+version: v25.0.4
 
 git:
   repo: https://github.com/WebAssembly/wasi-libc.git
