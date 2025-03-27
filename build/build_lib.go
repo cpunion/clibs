@@ -21,13 +21,13 @@ func getBuildEnv(modLocalPath, buildDir, platform, arch string) []string {
 	env := os.Environ()
 	env = append(env,
 		fmt.Sprintf("CLIBS_PACKAGE_DIR=%s", modLocalPath),
+		fmt.Sprintf("CLIBS_DOWNLOAD_DIR=%s", downloadDir),
 		fmt.Sprintf("CLIBS_BUILD_GOOS=%s", platform),
 		fmt.Sprintf("CLIBS_BUILD_GOARCH=%s", arch),
 		fmt.Sprintf("CLIBS_BUILD_TARGET=%s", targetTriple),
 		fmt.Sprintf("CLIBS_BUILD_CFLAGS=%s", cflags),
 		fmt.Sprintf("CLIBS_BUILD_LDFLAGS=%s", ldflags),
 		fmt.Sprintf("CLIBS_BUILD_DIR=%s", buildDir),
-		fmt.Sprintf("CLIBS_DOWNLOAD_DIR=%s", downloadDir),
 	)
 
 	return env
@@ -102,9 +102,9 @@ func getBuildFlags(triple string) (cflags string, ldflags string) {
 }
 
 // buildLib builds the library using the appropriate build method
-func buildLib(config *Config, buildDir, modLocalPath string, platform, arch string) error {
+func (pkg *Package) buildLib(config BuildConfig, buildDir string) error {
 	// 获取下载目录
-	downloadDir := GetDownloadDir(modLocalPath)
+	downloadDir := GetDownloadDir(pkg.Path)
 	if _, err := os.Stat(downloadDir); err != nil {
 		// 如果下载目录不存在，尝试创建它
 		if os.IsNotExist(err) {
@@ -125,14 +125,14 @@ func buildLib(config *Config, buildDir, modLocalPath string, platform, arch stri
 	fmt.Printf("  Build directory: %s\n", buildDir)
 
 	// 首先检查配置中是否有构建命令
-	if config.Build != nil && config.Build.Command != "" {
-		fmt.Printf("  Executing build command: %s\n", config.Build.Command)
+	if pkg.Config.Build != nil && pkg.Config.Build.Command != "" {
+		fmt.Printf("  Executing build command: %s\n", pkg.Config.Build.Command)
 
 		// 获取构建环境变量
-		buildEnv := getBuildEnv(modLocalPath, buildDir, platform, arch)
+		buildEnv := getBuildEnv(pkg.Path, buildDir, config.Goos, config.Goarch)
 
 		// 对于包含shell特殊字符的命令，使用shell执行
-		cmd := exec.Command("bash", "-c", config.Build.Command)
+		cmd := exec.Command("bash", "-c", pkg.Config.Build.Command)
 		cmd.Dir = downloadDir
 		cmd.Env = buildEnv
 

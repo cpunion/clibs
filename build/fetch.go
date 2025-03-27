@@ -11,9 +11,9 @@ import (
 )
 
 // fetchLib fetches the library source based on the configuration
-func fetchLib(config *Config, modLocalPath string) error {
+func (p *Package) fetchLib() error {
 	// 获取下载目录
-	downloadDir := GetDownloadDir(modLocalPath)
+	downloadDir := GetDownloadDir(p.Path)
 
 	// 临时下载目录，用于保证原子性
 	downloadTmpDir := downloadDir + "_tmp"
@@ -36,12 +36,12 @@ func fetchLib(config *Config, modLocalPath string) error {
 	var fetchErr error
 
 	// 根据配置选择下载方式
-	if config.Git != nil && config.Git.Repo != "" {
-		fmt.Printf("  Fetching from git repository: %s\n", config.Git.Repo)
-		fetchErr = fetchFromGit(config.Git, downloadTmpDir)
-	} else if len(config.Files) > 0 {
+	if p.Config.Git != nil && p.Config.Git.Repo != "" {
+		fmt.Printf("  Fetching from git repository: %s\n", p.Config.Git.Repo)
+		fetchErr = fetchFromGit(p.Config.Git, downloadTmpDir)
+	} else if len(p.Config.Files) > 0 {
 		fmt.Printf("  Fetching from files\n")
-		fetchErr = fetchFromFiles(config.Files, downloadTmpDir)
+		fetchErr = fetchFromFiles(p.Config.Files, downloadTmpDir)
 	} else {
 		fetchErr = fmt.Errorf("no valid fetch configuration found")
 	}
@@ -54,7 +54,7 @@ func fetchLib(config *Config, modLocalPath string) error {
 	}
 
 	// 创建下载哈希文件
-	if err := saveHash(downloadTmpDir, *config, false); err != nil {
+	if err := saveHash(downloadTmpDir, p.Config, false); err != nil {
 		os.RemoveAll(downloadTmpDir)
 		return fmt.Errorf("failed to create download hash file: %v", err)
 	}
@@ -76,7 +76,7 @@ func fetchLib(config *Config, modLocalPath string) error {
 }
 
 // fetchFromGit clones a git repository
-func fetchFromGit(gitConfig *GitConfig, downloadDir string) error {
+func fetchFromGit(gitConfig *GitSpec, downloadDir string) error {
 	// 清理下载目录，确保没有残留文件
 	files, err := os.ReadDir(downloadDir)
 	if err != nil {
@@ -124,7 +124,7 @@ func fetchFromGit(gitConfig *GitConfig, downloadDir string) error {
 }
 
 // fetchFromFiles downloads files specified in the configuration
-func fetchFromFiles(files []FileConfig, downloadDir string) error {
+func fetchFromFiles(files []FileSpec, downloadDir string) error {
 	// 确保下载目录存在
 	if err := os.MkdirAll(downloadDir, 0755); err != nil {
 		return fmt.Errorf("failed to create download directory: %v", err)
