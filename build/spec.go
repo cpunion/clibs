@@ -1,7 +1,5 @@
 package build
 
-import "encoding/json"
-
 // StatusFile constants for tracking library status
 const (
 	BuildDirName    = "_build"
@@ -15,44 +13,36 @@ const (
 )
 
 type GitSpec struct {
-	Repo string
-	Ref  string
+	Repo string `json:"repo,omitempty"`
+	Ref  string `json:"ref,omitempty"`
 }
 
 type FileSpec struct {
-	URL string
+	URL string `json:"url,omitempty"`
 }
 
 type BuildSpec struct {
-	Command string
+	Command string `json:"command,omitempty"`
 }
 
 type PkgSpec struct {
-	Name    string
-	Version string
-	Git     *GitSpec
-	Files   []FileSpec
-	Build   *BuildSpec
-	Export  string
+	Name    string     `json:"name,omitempty"`
+	Version string     `json:"version,omitempty"`
+	Git     *GitSpec   `json:"git,omitempty"`
+	Files   []FileSpec `json:"files,omitempty"`
+	Build   *BuildSpec `json:"build,omitempty"`
+	Export  string     `json:"export,omitempty"`
 }
 
-func (c *PkgSpec) DownloadHash() string {
+func (c *PkgSpec) DownloadHash() PkgSpec {
 	hashConfig := *c
 	hashConfig.Build = nil
 	hashConfig.Export = ""
-	data, err := json.Marshal(hashConfig)
-	if err != nil {
-		panic(err)
-	}
-	return string(data)
+	return hashConfig
 }
 
-func (c *PkgSpec) BuildHash() string {
-	data, err := json.Marshal(*c)
-	if err != nil {
-		panic(err)
-	}
-	return string(data)
+func (c *PkgSpec) BuildHash() PkgSpec {
+	return *c
 }
 
 // Package represents a package to be built
