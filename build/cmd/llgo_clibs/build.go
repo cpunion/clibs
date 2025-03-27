@@ -5,7 +5,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/goplus/clibs/build"
+	"github.com/cpunion/clibs/build"
 	"github.com/spf13/cobra"
 )
 
