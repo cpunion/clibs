@@ -33,7 +33,7 @@ type pkgInfo struct {
 }
 
 // ListLibs gets all C libraries from the current project dependencies
-func ListLibs(patterns ...string) ([]Lib, error) {
+func ListLibs(patterns ...string) ([]*Lib, error) {
 	// Get module paths
 	mods, err := listMods(patterns)
 	if err != nil {
@@ -97,8 +97,8 @@ func parseJSON(data []byte) ([]string, error) {
 }
 
 // findLibs processes modules to find lib.yaml files
-func findLibs(mods []string) ([]Lib, error) {
-	var libs []Lib
+func findLibs(mods []string) ([]*Lib, error) {
+	var libs []*Lib
 
 	for _, mod := range mods {
 		lib, found, err := processLib(mod)
@@ -116,7 +116,7 @@ func findLibs(mods []string) ([]Lib, error) {
 }
 
 // processLib processes a single module to find lib.yaml
-func processLib(mod string) (Lib, bool, error) {
+func processLib(mod string) (*Lib, bool, error) {
 	// Get detailed module info including Sum field
 	cmd := exec.Command("go", "list", "-m", "-json", mod)
 
@@ -131,18 +131,18 @@ func processLib(mod string) (Lib, bool, error) {
 		if stderr.Len() > 0 {
 			fmt.Printf("Error output for module %s: %s\n", mod, stderr.String())
 		}
-		return Lib{}, false, fmt.Errorf("error finding module info: %v", err)
+		return nil, false, fmt.Errorf("error finding module info: %v", err)
 	}
 
 	// Parse module info
 	var info libInfo
 	if err := json.Unmarshal(stdout.Bytes(), &info); err != nil {
-		return Lib{}, false, fmt.Errorf("error parsing module info: %v", err)
+		return nil, false, fmt.Errorf("error parsing module info: %v", err)
 	}
 
 	dir := info.Dir
 	if dir == "" {
-		return Lib{}, false, fmt.Errorf("no local path found")
+		return nil, false, fmt.Errorf("no local path found")
 	}
 
 	// Check if lib.yaml exists
@@ -150,11 +150,11 @@ func processLib(mod string) (Lib, bool, error) {
 	fmt.Printf("  Checking for lib.yaml: %s\n", yamlPath)
 	if _, err := os.Stat(yamlPath); err != nil {
 		// lib.yaml doesn't exist
-		return Lib{}, false, nil
+		return nil, false, nil
 	}
 
 	// Create lib object
-	lib := Lib{
+	lib := &Lib{
 		ModName: mod,
 		Path:    dir,
 		Sum:     info.Sum,
@@ -163,13 +163,13 @@ func processLib(mod string) (Lib, bool, error) {
 	// Read config file
 	data, err := os.ReadFile(yamlPath)
 	if err != nil {
-		return Lib{}, false, fmt.Errorf("error reading config: %v", err)
+		return nil, false, fmt.Errorf("error reading config: %v", err)
 	}
 
 	// Parse YAML
 	var config LibSpec
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		return Lib{}, false, fmt.Errorf("error parsing YAML: %v", err)
+		return nil, false, fmt.Errorf("error parsing YAML: %v", err)
 	}
 
 	fmt.Printf("  Found lib.yaml: %s at %s\n", mod, yamlPath)
