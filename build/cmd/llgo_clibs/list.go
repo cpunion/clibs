@@ -10,11 +10,11 @@ import (
 
 // listCmd represents the list command
 var listCmd = &cobra.Command{
-	Use:   "list [libules...]",
-	Short: "List C libraries in specified libules",
-	Long:  `List C libraries in specified Go libules based on lib.yaml configuration.`,
+	Use:   "list [libs...]",
+	Short: "List C libraries in specified libs",
+	Long:  `List C libraries in specified Go libs based on lib.yaml configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Get libs from specified libules or all libules if none specified
+		// Get libs from specified libs or all libs if none specified
 		libs, err := build.ListLibs(args...)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error listing C libraries: %v\n", err)

@@ -18,7 +18,7 @@ func Build(config BuildConfig, libs []Lib) error {
 	if len(libs) == 0 {
 		fmt.Println("\nBuilding C library libs:")
 	} else {
-		fmt.Println("\nChecking specified libules for lib.yaml files:")
+		fmt.Println("\nChecking specified libs for lib.yaml files:")
 	}
 
 	for _, lib := range libs {

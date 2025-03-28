@@ -11,9 +11,9 @@ import (
 
 // exportCmd represents the export command
 var exportCmd = &cobra.Command{
-	Use:   "export [libules...]",
+	Use:   "export [libs...]",
 	Short: "Export environment variables from C libraries",
-	Long:  `Export environment variables from C libraries for specified Go libules based on lib.yaml configuration.`,
+	Long:  `Export environment variables from C libraries for specified Go libs based on lib.yaml configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		goos := os.Getenv("GOOS")
 		goarch := os.Getenv("GOARCH")

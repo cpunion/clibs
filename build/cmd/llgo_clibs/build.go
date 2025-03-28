@@ -11,9 +11,9 @@ import (
 
 // buildCmd represents the build command
 var buildCmd = &cobra.Command{
-	Use:   "build [libules...]",
-	Short: "Build C libraries for specified libules",
-	Long:  `Build C libraries for specified Go libules based on lib.yaml configuration.`,
+	Use:   "build [libs...]",
+	Short: "Build C libraries for specified libs",
+	Long:  `Build C libraries for specified Go libs based on lib.yaml configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		goos := os.Getenv("GOOS")
 		goarch := os.Getenv("GOARCH")
