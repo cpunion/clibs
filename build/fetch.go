@@ -11,7 +11,7 @@ import (
 )
 
 // fetchLib fetches the library source based on the configuration
-func (p *Package) fetchLib() error {
+func (p *Lib) fetchLib() error {
 	// 获取下载目录
 	downloadDir := GetDownloadDir(*p)
 

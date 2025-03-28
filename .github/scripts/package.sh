@@ -1,17 +1,17 @@
 #!/bin/bash
 # package.sh - Package prebuilt libraries for distribution
-# Usage: package.sh <prebuilt_dir> <output_dir> [package_name] [version]
-# Example: package.sh _prebuilt /tmp mypackage 1.0.0
+# Usage: package.sh <prebuilt_dir> <output_dir> [lib_name] [version]
+# Example: package.sh _prebuilt /tmp mylib 1.0.0
 
 set -e
 
 PREBUILT_DIR="$1"
 OUTPUT_DIR="$2"
-PACKAGE_NAME="$3"
+LIB_NAME="$3"
 VERSION="$4"
 
 if [ -z "$PREBUILT_DIR" ] || [ -z "$OUTPUT_DIR" ]; then
-  echo "Usage: package.sh <prebuilt_dir> <output_dir> [package_name] [version]"
+  echo "Usage: package.sh <prebuilt_dir> <output_dir> [lib_name] [version]"
   exit 1
 fi
 
@@ -24,30 +24,30 @@ if [ ! -d "$PREBUILT_DIR" ]; then
   exit 1
 fi
 
-# Get current directory name if package name not provided
-if [ -z "$PACKAGE_NAME" ]; then
-  PACKAGE_NAME=$(basename "$(pwd)")
+# Get current directory name if lib name not provided
+if [ -z "$LIB_NAME" ]; then
+  LIB_NAME=$(basename "$(pwd)")
 fi
 
-echo "Packaging targets from $PREBUILT_DIR for package $PACKAGE_NAME"
+echo "Packaging targets from $PREBUILT_DIR for lib $LIB_NAME"
 
 # Find all subdirectories in the prebuilt directory (these are the targets)
 for TARGET_DIR in "$PREBUILT_DIR"/*; do
   if [ -d "$TARGET_DIR" ]; then
     TARGET_NAME=$(basename "$TARGET_DIR")
-    
+
     # Create artifact name
     if [ -n "$VERSION" ]; then
-      ARTIFACT_NAME="${PACKAGE_NAME}-${VERSION}-${TARGET_NAME}"
+      ARTIFACT_NAME="${LIB_NAME}-${VERSION}-${TARGET_NAME}"
     else
-      ARTIFACT_NAME="${PACKAGE_NAME}-${TARGET_NAME}"
+      ARTIFACT_NAME="${LIB_NAME}-${TARGET_NAME}"
     fi
-    
+
     echo "Packaging target: $TARGET_NAME as $ARTIFACT_NAME.tar.gz"
-    
+
     # Create tarball
     tar -czf "$OUTPUT_DIR/${ARTIFACT_NAME}.tar.gz" -C "$PREBUILT_DIR" "$TARGET_NAME"
-    
+
     echo "Created: $OUTPUT_DIR/${ARTIFACT_NAME}.tar.gz"
   fi
 done

@@ -8,18 +8,18 @@ import (
 	"strings"
 )
 
-func Export(config BuildConfig, pkgs []Package) (exports [][2]string, err error) {
-	for _, pkg := range pkgs {
-		pkgExports, err := pkg.Export(config)
+func Export(config BuildConfig, libs []Lib) (exports [][2]string, err error) {
+	for _, lib := range libs {
+		libExports, err := lib.Export(config)
 		if err != nil {
 			return nil, err
 		}
-		exports = append(exports, pkgExports...)
+		exports = append(exports, libExports...)
 	}
 	return
 }
 
-func (p *Package) Export(config BuildConfig) (exports [][2]string, err error) {
+func (p *Lib) Export(config BuildConfig) (exports [][2]string, err error) {
 	if p.Config.Export == "" {
 		return nil, nil
 	}

@@ -11,9 +11,9 @@ import (
 
 // buildCmd represents the build command
 var buildCmd = &cobra.Command{
-	Use:   "build [modules...]",
-	Short: "Build C libraries for specified modules",
-	Long:  `Build C libraries for specified Go modules based on pkg.yaml configuration.`,
+	Use:   "build [libules...]",
+	Short: "Build C libraries for specified libules",
+	Long:  `Build C libraries for specified Go libules based on lib.yaml configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		goos := os.Getenv("GOOS")
 		goarch := os.Getenv("GOARCH")
@@ -31,9 +31,9 @@ var buildCmd = &cobra.Command{
 		fmt.Printf("Build: GOOS: %s, GOARCH: %s, Force: %v, Prebuilt: %v\n",
 			goos, goarch, force, prebuilt)
 
-		pkgs, err := build.ListPkgs(args...)
+		libs, err := build.ListLibs(args...)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error getting C library packages: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error getting C library libs: %v\n", err)
 			os.Exit(1)
 		}
 		buildConfig := build.BuildConfig{
@@ -42,7 +42,7 @@ var buildCmd = &cobra.Command{
 			Force:    force,
 			Prebuilt: prebuilt,
 		}
-		err = build.Build(buildConfig, pkgs)
+		err = build.Build(buildConfig, libs)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)

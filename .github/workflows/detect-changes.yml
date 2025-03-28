@@ -30,7 +30,7 @@ jobs:
         with:
           fetch-depth: 0 # Fetch all history for comparing changes
 
-      - name: Detect changed directories with pkg.yaml
+      - name: Detect changed directories with lib.yaml
         id: detect-changes
         run: |
           # Determine the appropriate refs based on event type
@@ -67,14 +67,14 @@ jobs:
             echo "- $dir"
           done
 
-  build-packages:
+  build-libs:
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
     continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
-        package: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+        lib: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
         os: [ubuntu-latest, macos-latest]
         arch: [amd64, arm64]
     runs-on: ${{ matrix.os }}
@@ -90,25 +90,25 @@ jobs:
         working-directory: build
         run: go install ./cmd/llgo_clibs
 
-      - name: Build package ${{ matrix.package }}
+      - name: Build lib ${{ matrix.lib }}
         run: |
-          echo "Building package ${{ matrix.package }} for ${{ matrix.os }}/${{ matrix.arch }}"
-          cd "${{ matrix.package }}"
+          echo "Building lib ${{ matrix.lib }} for ${{ matrix.os }}/${{ matrix.arch }}"
+          cd "${{ matrix.lib }}"
           llgo_clibs build --prebuilt
 
-      - name: Build package ${{ matrix.package }} for wasip1
+      - name: Build lib ${{ matrix.lib }} for wasip1
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'amd64'
         run: |
           echo "Building wasip1 for ${{ matrix.os }}/${{ matrix.arch }}"
-          cd "${{ matrix.package }}"
+          cd "${{ matrix.lib }}"
           GOOS=wasip1 GOARCH=wasm llgo_clibs build --prebuilt
 
-      - name: Get package version
-        id: get-package-version
+      - name: Get lib version
+        id: get-lib-version
         run: |
-          # Extract version from pkg.yaml directly
-          if [ -f "${{ matrix.package }}/pkg.yaml" ]; then
-            VERSION=$(grep -E "^version:" "${{ matrix.package }}/pkg.yaml" | awk '{print $2}' | tr -d '"' | tr -d "'")
+          # Extract version from lib.yaml directly
+          if [ -f "${{ matrix.lib }}/lib.yaml" ]; then
+            VERSION=$(grep -E "^version:" "${{ matrix.lib }}/lib.yaml" | awk '{print $2}' | tr -d '"' | tr -d "'")
             if [ -z "$VERSION" ]; then
               VERSION="unknown"
             fi
@@ -116,41 +116,38 @@ jobs:
             VERSION="unknown"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Package ${{ matrix.package }} version: $VERSION"
+          echo "Lib ${{ matrix.lib }} version: $VERSION"
 
       - name: Package artifacts
         id: package-artifacts
         run: |
-          PACKAGE_NAME=$(basename "${{ matrix.package }}")
-          VERSION="${{ steps.get-package-version.outputs.version }}"
-
-          # Make the packaging script executable
-          chmod +x .github/scripts/package.sh
+          LIB_NAME=$(basename "${{ matrix.lib }}")
+          VERSION="${{ steps.get-lib-version.outputs.version }}"
 
           # Create artifacts directory
           mkdir -p /tmp/artifacts
 
           # Check if _prebuilt directory exists
-          if [ -d "${{ matrix.package }}/_prebuilt" ]; then
-            cd "${{ matrix.package }}"
-            ../.github/scripts/package.sh _prebuilt /tmp/artifacts "$PACKAGE_NAME" "$VERSION"
+          if [ -d "${{ matrix.lib }}/_prebuilt" ]; then
+            cd "${{ matrix.lib }}"
+            ../.github/scripts/package.sh _prebuilt /tmp/artifacts "$LIB_NAME" "$VERSION"
           else
-            echo "No _prebuilt directory found in ${{ matrix.package }}"
+            echo "No _prebuilt directory found in ${{ matrix.lib }}"
           fi
 
-          # Create metadata file with package info
-          echo "PACKAGE_NAME=$PACKAGE_NAME" > /tmp/artifacts/package_info.txt
-          echo "VERSION=$VERSION" >> /tmp/artifacts/package_info.txt
+          # Create metadata file with lib info
+          echo "LIB_NAME=$LIB_NAME" > /tmp/artifacts/lib_info.txt
+          echo "VERSION=$VERSION" >> /tmp/artifacts/lib_info.txt
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.package }}-${{ matrix.os }}-${{ matrix.arch }}
+          name: ${{ matrix.lib }}-${{ matrix.os }}-${{ matrix.arch }}
           path: /tmp/artifacts/
           if-no-files-found: ignore
 
   create-release:
-    needs: [detect-changes, build-packages]
+    needs: [detect-changes, build-libs]
     if: always() && needs.detect-changes.outputs.has_changes == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -168,49 +165,49 @@ jobs:
           find ./artifacts -type f -name "*.tar.gz" -exec cp {} ./release-assets/ \;
           ls -la ./release-assets/
 
-      - name: Create releases for each package
+      - name: Create releases for each lib
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Create a mapping of package names to versions
-          declare -A package_versions
+          # Create a mapping of lib names to versions
+          declare -A lib_versions
 
-          # Extract package info from metadata files without using a pipe (to avoid subshell)
+          # Extract lib info from metadata files without using a pipe (to avoid subshell)
           while read -r info_file; do
             # Process each metadata file
-            current_package=""
+            current_lib=""
             current_version=""
 
             while IFS= read -r line; do
-              if [[ "$line" == PACKAGE_NAME=* ]]; then
-                current_package="${line#PACKAGE_NAME=}"
+              if [[ "$line" == LIB_NAME=* ]]; then
+                current_lib="${line#LIB_NAME=}"
               elif [[ "$line" == VERSION=* ]]; then
                 current_version="${line#VERSION=}"
               fi
             done < "$info_file"
 
-            if [[ -n "$current_package" && -n "$current_version" ]]; then
-              package_versions["$current_package"]="$current_version"
-              echo "Found package: $current_package, version: $current_version"
+            if [[ -n "$current_lib" && -n "$current_version" ]]; then
+              lib_versions["$current_lib"]="$current_version"
+              echo "Found lib: $current_lib, version: $current_version"
             fi
-          done < <(find ./artifacts -name "package_info.txt")
+          done < <(find ./artifacts -name "lib_info.txt")
 
-          echo "Package versions map:"
-          for pkg in "${!package_versions[@]}"; do
-            echo "  $pkg: ${package_versions[$pkg]}"
+          echo "Lib versions map:"
+          for pkg in "${!lib_versions[@]}"; do
+            echo "  $pkg: ${lib_versions[$pkg]}"
           done
 
-          # Process each unique package
-          for PACKAGE_NAME in "${!package_versions[@]}"; do
-            VERSION="${package_versions[$PACKAGE_NAME]}"
+          # Process each unique lib
+          for LIB_NAME in "${!lib_versions[@]}"; do
+            VERSION="${lib_versions[$LIB_NAME]}"
 
             if [ -z "$VERSION" ] || [ "$VERSION" == "unknown" ]; then
-              echo "Skipping release for $PACKAGE_NAME with unknown version"
+              echo "Skipping release for $LIB_NAME with unknown version"
               continue
             fi
 
-            RELEASE_NAME="${PACKAGE_NAME}/${VERSION}"
-            RELEASE_TAG="${PACKAGE_NAME}/${VERSION}"
+            RELEASE_NAME="${LIB_NAME}/${VERSION}"
+            RELEASE_TAG="${LIB_NAME}/${VERSION}"
 
             echo "Creating release $RELEASE_NAME with tag $RELEASE_TAG"
 
@@ -251,7 +248,7 @@ jobs:
               if [[ "$release_id" != "null" ]]; then
                 # Upload assets to existing release
                 echo "Uploading assets to existing release with ID: $release_id"
-                for asset in ./release-assets/${PACKAGE_NAME}-${VERSION}-*.tar.gz; do
+                for asset in ./release-assets/${LIB_NAME}-${VERSION}-*.tar.gz; do
                   if [ -f "$asset" ]; then
                     asset_name=$(basename "$asset")
                     echo "Uploading asset: $asset_name"
@@ -288,7 +285,7 @@ jobs:
             release_response=$(curl -s -X POST \
               -H "Authorization: token $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github.v3+json" \
-              -d "{\"tag_name\":\"$RELEASE_TAG\",\"name\":\"$RELEASE_NAME\",\"body\":\"Prebuilt binaries for $PACKAGE_NAME version $VERSION\",\"draft\":false,\"prerelease\":false}" \
+              -d "{\"tag_name\":\"$RELEASE_TAG\",\"name\":\"$RELEASE_NAME\",\"body\":\"Prebuilt binaries for $LIB_NAME version $VERSION\",\"draft\":false,\"prerelease\":false}" \
               "https://api.github.com/repos/${{ github.repository }}/releases")
 
             release_id=$(echo "$release_response" | jq -r '.id')
@@ -300,9 +297,9 @@ jobs:
 
             echo "Created release with ID: $release_id"
 
-            # Upload assets for this package
-            echo "Looking for assets matching: ./release-assets/${PACKAGE_NAME}-${VERSION}-*.tar.gz"
-            for asset in ./release-assets/${PACKAGE_NAME}-${VERSION}-*.tar.gz; do
+            # Upload assets for this lib
+            echo "Looking for assets matching: ./release-assets/${LIB_NAME}-${VERSION}-*.tar.gz"
+            for asset in ./release-assets/${LIB_NAME}-${VERSION}-*.tar.gz; do
               if [ -f "$asset" ]; then
                 asset_name=$(basename "$asset")
                 echo "Uploading asset: $asset_name"
@@ -314,28 +311,28 @@ jobs:
                   --data-binary @"$asset" \
                   "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=$asset_name"
               else
-                echo "No matching assets found for pattern: ./release-assets/${PACKAGE_NAME}-${VERSION}-*.tar.gz"
+                echo "No matching assets found for pattern: ./release-assets/${LIB_NAME}-${VERSION}-*.tar.gz"
               fi
             done
           done
 
   summarize:
-    needs: [detect-changes, build-packages, create-release]
+    needs: [detect-changes, build-libs, create-release]
     if: always() && needs.detect-changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Summarize build results
         run: |
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "Build status: ${{ needs.build-packages.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "Build status: ${{ needs.build-libs.result }}" >> $GITHUB_STEP_SUMMARY
 
-          if [[ "${{ needs.build-packages.result }}" == "success" ]]; then
-            echo " All packages built successfully" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.build-libs.result }}" == "success" ]]; then
+            echo " All libs built successfully" >> $GITHUB_STEP_SUMMARY
           else
-            echo " Some packages failed to build" >> $GITHUB_STEP_SUMMARY
+            echo " Some libs failed to build" >> $GITHUB_STEP_SUMMARY
           fi
 
-          echo "### Changed packages:" >> $GITHUB_STEP_SUMMARY
+          echo "### Changed libs:" >> $GITHUB_STEP_SUMMARY
           for dir in ${{ fromJson(needs.detect-changes.outputs.matrix) }}; do
             echo "- $dir" >> $GITHUB_STEP_SUMMARY
           done
@@ -347,5 +344,5 @@ jobs:
 
           if [[ "${{ github.event_name }}" == "push" ]]; then
             echo "### Releases:" >> $GITHUB_STEP_SUMMARY
-            echo "Releases were created for each package with prebuilt binaries as assets." >> $GITHUB_STEP_SUMMARY
+            echo "Releases were created for each lib with prebuilt binaries as assets." >> $GITHUB_STEP_SUMMARY
           fi

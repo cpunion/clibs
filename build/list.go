@@ -11,102 +11,102 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ModuleInfo represents the JSON output from go list -m -json
-type ModuleInfo struct {
+// LibInfo represents the JSON output from go list -m -json
+type LibInfo struct {
 	Path    string
 	Version string
 	Dir     string
 	Sum     string
 }
 
-// ListPkgs 获取当前项目依赖的所有C库包
-func ListPkgs(pkgs ...string) ([]Package, error) {
-	var packages []Package
+// ListLibs 获取当前项目依赖的所有C库包
+func ListLibs(patterns ...string) ([]Lib, error) {
+	var libs []Lib
 
 	// 获取项目依赖的所有模块或指定的模块
-	var modules []string
-	if len(pkgs) == 0 {
+	var clibs []string
+	if len(patterns) == 0 {
 		// 获取所有模块
 		cmd := exec.Command("go", "list", "-m", "all")
 		output, err := cmd.Output()
 		if err != nil {
-			return nil, fmt.Errorf("failed to list modules: %v", err)
+			return nil, fmt.Errorf("failed to list clibs: %v", err)
 		}
-		modules = strings.Split(string(output), "\n")
+		clibs = strings.Split(string(output), "\n")
 	} else {
 		// 获取指定的模块
-		fmt.Printf("Executing: go list -m %s\n", strings.Join(pkgs, " "))
-		args := append([]string{"list", "-m"}, pkgs...)
+		fmt.Printf("Executing: go list %s\n", strings.Join(patterns, " "))
+		args := append([]string{"list"}, patterns...)
 		cmd := exec.Command("go", args...)
 		output, err := cmd.Output()
 		if err != nil {
-			return nil, fmt.Errorf("failed to list specified modules: %v", err)
+			return nil, fmt.Errorf("failed to list specified clibs: %v", err)
 		}
-		modules = strings.Split(strings.TrimSpace(string(output)), "\n")
+		clibs = strings.Split(strings.TrimSpace(string(output)), "\n")
 	}
 
 	// 处理模块列表
-	for _, mod := range modules {
-		if mod == "" {
+	for _, lib := range clibs {
+		if lib == "" {
 			continue
 		}
 
 		// 提取模块路径（例如 github.com/user/repo）
-		modPath := mod
-		if idx := strings.Index(mod, " "); idx > 0 {
-			modPath = strings.TrimSpace(mod[:idx])
+		libPath := lib
+		if idx := strings.Index(lib, " "); idx > 0 {
+			libPath = strings.TrimSpace(lib[:idx])
 		}
 
 		// 获取模块详细信息，包括Sum字段
-		cmd := exec.Command("go", "list", "-m", "-json", modPath)
-		modOutput, err := cmd.Output()
+		cmd := exec.Command("go", "list", "-m", "-json", libPath)
+		libOutput, err := cmd.Output()
 		if err != nil {
-			fmt.Printf("- %s: Error finding module info: %v\n", modPath, err)
+			fmt.Printf("- %s: Error finding libule info: %v\n", libPath, err)
 			continue
 		}
 
 		// 解析JSON输出
-		var moduleInfo ModuleInfo
-		if err := json.Unmarshal(modOutput, &moduleInfo); err != nil {
-			fmt.Printf("- %s: Error parsing module info: %v\n", modPath, err)
+		var libuleInfo LibInfo
+		if err := json.Unmarshal(libOutput, &libuleInfo); err != nil {
+			fmt.Printf("- %s: Error parsing libule info: %v\n", libPath, err)
 			continue
 		}
 
-		modLocalPath := moduleInfo.Dir
-		if modLocalPath == "" {
-			fmt.Printf("- %s: No local path found\n", modPath)
+		libLocalPath := libuleInfo.Dir
+		if libLocalPath == "" {
+			fmt.Printf("- %s: No local path found\n", libPath)
 			continue
 		}
 
-		// 检查是否存在pkg.yaml
-		pkgYamlPath := filepath.Join(modLocalPath, "pkg.yaml")
-		fmt.Printf("  Checking for pkg.yaml: %s\n", pkgYamlPath)
-		if _, err := os.Stat(pkgYamlPath); err == nil {
+		// 检查是否存在lib.yaml
+		libYamlPath := filepath.Join(libLocalPath, "lib.yaml")
+		fmt.Printf("  Checking for lib.yaml: %s\n", libYamlPath)
+		if _, err := os.Stat(libYamlPath); err == nil {
 			// 创建包对象
-			pkg := Package{
-				Mod:  modPath,
-				Path: modLocalPath,
-				Sum:  moduleInfo.Sum,
+			lib := Lib{
+				ModName: libPath,
+				Path:    libLocalPath,
+				Sum:     libuleInfo.Sum,
 			}
 
 			// 读取配置文件
-			configContent, err := os.ReadFile(pkgYamlPath)
+			configContent, err := os.ReadFile(libYamlPath)
 			if err != nil {
-				fmt.Printf("  Error reading config %s: %v\n", modPath, err)
+				fmt.Printf("  Error reading config %s: %v\n", libPath, err)
 				continue
 			}
 			// 解析YAML
-			var config PkgSpec
+			var config LibSpec
 			if err := yaml.Unmarshal(configContent, &config); err != nil {
-				fmt.Printf("  Error parsing YAML %s: %v\n", modPath, err)
+				fmt.Printf("  Error parsing YAML %s: %v\n", libPath, err)
 				continue
 			}
-			fmt.Printf("  Found pkg.yaml: %s at %s\n", modPath, pkgYamlPath)
+			fmt.Printf("  Found lib.yaml: %s at %s\n", libPath, libYamlPath)
 			fmt.Printf("  Config: %v\n", config)
-			pkg.Config = config
-			packages = append(packages, pkg)
+			lib.Config = config
+			libs = append(libs, lib)
 		}
 	}
 
-	return packages, nil
+	return libs, nil
 }
