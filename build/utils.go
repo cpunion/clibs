@@ -8,22 +8,16 @@ import (
 	"strings"
 )
 
-// ConfigHashInfo represents status information
-type ConfigHashInfo struct {
-	ConfigHash any   `json:"config_hash"`
-	Timestamp  int64 `json:"timestamp"`
-}
-
-func GetBuildDirByName(lib Lib, dirName, platform, arch string) string {
+func getBuildDirByName(lib Lib, dirName, platform, arch string) string {
 	return filepath.Join(getBuildBaseDir(lib), dirName, getTargetTriple(platform, arch))
 }
 
-// GetDownloadDir returns the download directory
-func GetDownloadDir(lib Lib) string {
+// getDownloadDir returns the download directory
+func getDownloadDir(lib Lib) string {
 	return filepath.Join(getBuildBaseDir(lib), DownloadDirName)
 }
 
-func GetPrebuiltDir(lib Lib) string {
+func getPrebuiltDir(lib Lib) string {
 	return filepath.Join(getBuildBaseDir(lib), PrebuiltDirName)
 }
 

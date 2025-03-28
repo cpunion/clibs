@@ -15,7 +15,7 @@ func getBuildEnv(lib Lib, buildDir, platform, arch string) []string {
 	// 生成构建标志
 	cflags, ldflags := getBuildFlags(targetTriple)
 
-	downloadDir := GetDownloadDir(lib)
+	downloadDir := getDownloadDir(lib)
 
 	// 创建环境变量
 	env := os.Environ()
@@ -102,9 +102,9 @@ func getBuildFlags(triple string) (cflags string, ldflags string) {
 }
 
 // buildLib builds the library using the appropriate build method
-func (lib *Lib) buildLib(config BuildConfig, buildDir string) error {
+func (lib *Lib) buildLib(config Config, buildDir string) error {
 	// 获取下载目录
-	downloadDir := GetDownloadDir(*lib)
+	downloadDir := getDownloadDir(*lib)
 	if _, err := os.Stat(downloadDir); err != nil {
 		// 如果下载目录不存在，尝试创建它
 		if os.IsNotExist(err) {

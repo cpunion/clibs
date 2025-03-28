@@ -68,7 +68,7 @@ type Lib struct {
 	Config  LibSpec
 }
 
-type BuildConfig struct {
+type Config struct {
 	Goos     string
 	Goarch   string
 	Prebuilt bool

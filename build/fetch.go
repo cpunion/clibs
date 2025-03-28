@@ -13,7 +13,7 @@ import (
 // fetchLib fetches the library source based on the configuration
 func (p *Lib) fetchLib() error {
 	// 获取下载目录
-	downloadDir := GetDownloadDir(*p)
+	downloadDir := getDownloadDir(*p)
 
 	// 临时下载目录，用于保证原子性
 	downloadTmpDir := downloadDir + "_tmp"

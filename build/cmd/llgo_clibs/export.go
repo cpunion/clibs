@@ -36,7 +36,7 @@ var exportCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		buildConfig := build.BuildConfig{
+		buildConfig := build.Config{
 			Goos:     goos,
 			Goarch:   goarch,
 			Prebuilt: prebuilt,

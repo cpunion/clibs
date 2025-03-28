@@ -36,7 +36,7 @@ var buildCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "Error getting C library libs: %v\n", err)
 			os.Exit(1)
 		}
-		buildConfig := build.BuildConfig{
+		buildConfig := build.Config{
 			Goos:     goos,
 			Goarch:   goarch,
 			Force:    force,

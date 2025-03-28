@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func Export(config BuildConfig, libs []Lib) (exports [][2]string, err error) {
+func Export(config Config, libs []Lib) (exports [][2]string, err error) {
 	for _, lib := range libs {
 		libExports, err := lib.Export(config)
 		if err != nil {
@@ -19,12 +19,12 @@ func Export(config BuildConfig, libs []Lib) (exports [][2]string, err error) {
 	return
 }
 
-func (p *Lib) Export(config BuildConfig) (exports [][2]string, err error) {
+func (p *Lib) Export(config Config) (exports [][2]string, err error) {
 	if p.Config.Export == "" {
 		return nil, nil
 	}
 
-	buildDir := GetBuildDirByName(*p, BuildDirName, config.Goos, config.Goarch)
+	buildDir := getBuildDirByName(*p, BuildDirName, config.Goos, config.Goarch)
 	buildEnv := getBuildEnv(*p, buildDir, config.Goos, config.Goarch)
 
 	// Execute the export command using bash
