@@ -1,4 +1,4 @@
-package build
+package clibs
 
 // StatusFile constants for tracking library status
 const (

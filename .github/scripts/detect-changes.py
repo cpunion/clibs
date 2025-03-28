@@ -70,7 +70,7 @@ def main():
         directory = file.split('/')[0] if '/' in file else file
 
         # Skip if it's not a direct subdirectory or if it's a dot directory
-        if '/' in directory or directory.startswith('.') or directory == "build":
+        if '/' in directory or directory.startswith('.'):
             continue
 
         # Check if this directory has a lib.yaml file
@@ -88,7 +88,7 @@ def main():
                     print(f"Found changed directory with lib.yaml: {directory}")
 
     # Check all directories with lib.yaml files, not just changed ones
-    for directory in [d for d in os.listdir('.') if os.path.isdir(d) and not d.startswith('.') and d != 'build']:
+    for directory in [d for d in os.listdir('.') if os.path.isdir(d) and not d.startswith('.')]:
         if os.path.isfile(os.path.join(directory, "lib.yaml")):
             if not check_pkg_name_match(directory):
                 sys.exit(1)

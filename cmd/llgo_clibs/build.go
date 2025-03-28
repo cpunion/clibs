@@ -5,7 +5,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/cpunion/clibs/build"
+	"github.com/cpunion/clibs"
 	"github.com/spf13/cobra"
 )
 
@@ -31,18 +31,18 @@ var buildCmd = &cobra.Command{
 		fmt.Printf("Build: GOOS: %s, GOARCH: %s, Force: %v, Prebuilt: %v\n",
 			goos, goarch, force, prebuilt)
 
-		libs, err := build.ListLibs(args...)
+		libs, err := clibs.ListLibs(args...)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error getting C library libs: %v\n", err)
 			os.Exit(1)
 		}
-		buildConfig := build.Config{
+		buildConfig := clibs.Config{
 			Goos:     goos,
 			Goarch:   goarch,
 			Force:    force,
 			Prebuilt: prebuilt,
 		}
-		err = build.Build(buildConfig, libs)
+		err = clibs.Build(buildConfig, libs)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
