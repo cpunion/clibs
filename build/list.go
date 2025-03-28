@@ -34,7 +34,7 @@ type pkgInfo struct {
 // ListLibs gets all C libraries from the current project dependencies
 func ListLibs(patterns ...string) ([]Lib, error) {
 	// Get module paths
-	mods, err := getModules(patterns...)
+	mods, err := listMods(patterns)
 	if err != nil {
 		return nil, err
 	}
@@ -43,46 +43,11 @@ func ListLibs(patterns ...string) ([]Lib, error) {
 	return findLibs(mods)
 }
 
-// getModules returns a list of module paths
-func getModules(patterns ...string) ([]string, error) {
-	if len(patterns) == 0 {
-		return listAllMods()
-	}
-	return listModsFromPatterns(patterns)
-}
-
-// listAllMods gets all modules using "go list -m all"
-func listAllMods() ([]string, error) {
-	cmd := exec.Command("go", "list", "-m", "all")
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list modules: %v", err)
-	}
-
-	var mods []string
-	// Process output to get module paths
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if line == "" {
-			continue
-		}
-
-		// Extract module path (e.g., github.com/user/repo)
-		mod := line
-		if idx := strings.Index(line, " "); idx > 0 {
-			mod = strings.TrimSpace(line[:idx])
-		}
-
-		mods = append(mods, mod)
-	}
-
-	return mods, nil
-}
-
-// listModsFromPatterns gets modules from specified package patterns
-func listModsFromPatterns(patterns []string) ([]string, error) {
-	// Use go list -json to get package info
-	fmt.Printf("Executing: go list -json %s\n", strings.Join(patterns, " "))
-	args := append([]string{"list", "-json"}, patterns...)
+// listMods gets modules from specified package patterns
+func listMods(patterns []string) ([]string, error) {
+	// Use go list -json -deps to get package info and all dependencies
+	fmt.Printf("Executing: go list -json -deps %s\n", strings.Join(patterns, " "))
+	args := append([]string{"list", "-json", "-deps"}, patterns...)
 	cmd := exec.Command("go", args...)
 	out, err := cmd.Output()
 	if err != nil {
