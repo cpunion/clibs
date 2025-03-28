@@ -13,7 +13,7 @@ import (
 // fetchLib fetches the library source based on the configuration
 func (p *Lib) fetchLib() error {
 	// Get download directory
-	downloadDir := getDownloadDir(*p)
+	downloadDir := getDownloadDir(p)
 
 	// Temporary download directory for atomic operations
 	downloadTmpDir := downloadDir + "_tmp"

@@ -6,7 +6,7 @@ import (
 	"runtime"
 )
 
-func Build(config Config, libs []Lib) error {
+func Build(config Config, libs []*Lib) error {
 	if config.Goos == "" {
 		config.Goos = runtime.GOOS
 	}
@@ -48,7 +48,7 @@ func Build(config Config, libs []Lib) error {
 func (lib *Lib) tryDownloadPrebuilt(config Config) (string, error) {
 	name := lib.Config.Name
 	target := getTargetTriple(config.Goos, config.Goarch)
-	prebuiltRootDir := getPrebuiltDir(*lib)
+	prebuiltRootDir := getPrebuiltDir(lib)
 	uriEncodedTag := url.PathEscape(fmt.Sprintf("%s/%s", name, lib.Config.Version))
 	url := fmt.Sprintf("%s/%s/%s-%s-%s.tar.gz", ReleaseUrlPrefix, uriEncodedTag, name, lib.Config.Version, target)
 	fmt.Printf("  Downloading prebuilt lib: %s\n", url)
@@ -56,22 +56,25 @@ func (lib *Lib) tryDownloadPrebuilt(config Config) (string, error) {
 	if err := fetchFromFiles([]FileSpec{{URL: url}}, prebuiltRootDir, false); err != nil {
 		return "", err
 	}
-	return prebuiltRootDir, nil
+	prebuiltTargetDir := getBuildDirByName(lib, PrebuiltDirName, config.Goos, config.Goarch)
+	lib.Env = getBuildEnv(lib, prebuiltTargetDir, config.Goos, config.Goarch)
+	return prebuiltTargetDir, nil
 }
 
 func (lib *Lib) checkPrebuiltStatus(config Config) (string, error) {
-	prebuiltTargetDir := getBuildDirByName(*lib, PrebuiltDirName, config.Goos, config.Goarch)
+	prebuiltTargetDir := getBuildDirByName(lib, PrebuiltDirName, config.Goos, config.Goarch)
 	if matched, err := checkHash(prebuiltTargetDir, lib.Config, true); err != nil || !matched {
 		fmt.Printf("  No prebuilt lib  found in %s\n", prebuiltTargetDir)
 		return "", err
 	}
 	fmt.Printf("  Found prebuilt lib in %s\n", prebuiltTargetDir)
+	lib.Env = getBuildEnv(lib, prebuiltTargetDir, config.Goos, config.Goarch)
 	return prebuiltTargetDir, nil
 }
 
 // Build the library both build and prebuilt
 func (lib *Lib) tryBuildLib(config Config, buildDirName string) (string, error) {
-	buildTargetDir := getBuildDirByName(*lib, buildDirName, config.Goos, config.Goarch)
+	buildTargetDir := getBuildDirByName(lib, buildDirName, config.Goos, config.Goarch)
 	if !config.Force {
 		if matched, err := checkHash(buildTargetDir, lib.Config, true); err == nil && matched {
 			fmt.Printf("  Found built lib in %s\n", buildTargetDir)
@@ -80,7 +83,7 @@ func (lib *Lib) tryBuildLib(config Config, buildDirName string) (string, error) 
 	}
 	fmt.Printf("  No built lib found in %s\n", buildTargetDir)
 
-	downloadDir := getDownloadDir(*lib)
+	downloadDir := getDownloadDir(lib)
 	if matched, err := checkHash(downloadDir, lib.Config, false); err != nil || !matched {
 		fmt.Printf("matched: %v, err: %v\n", matched, err)
 		fmt.Printf("  No download lib found in %s\n", downloadDir)

@@ -8,7 +8,7 @@ import (
 )
 
 // getBuildEnv prepares build environment variables
-func getBuildEnv(lib Lib, buildDir, platform, arch string) []string {
+func getBuildEnv(lib *Lib, buildDir, platform, arch string) []string {
 	// Generate target triple
 	targetTriple := getTargetTriple(platform, arch)
 
@@ -18,8 +18,7 @@ func getBuildEnv(lib Lib, buildDir, platform, arch string) []string {
 	downloadDir := getDownloadDir(lib)
 
 	// Create environment variables
-	env := os.Environ()
-	env = append(env,
+	return []string{
 		fmt.Sprintf("%s=%s", EnvPackageDir, lib.Path),
 		fmt.Sprintf("%s=%s", EnvDownloadDir, downloadDir),
 		fmt.Sprintf("%s=%s", EnvBuildGoos, platform),
@@ -28,9 +27,7 @@ func getBuildEnv(lib Lib, buildDir, platform, arch string) []string {
 		fmt.Sprintf("%s=%s", EnvBuildCflags, cflags),
 		fmt.Sprintf("%s=%s", EnvBuildLdflags, ldflags),
 		fmt.Sprintf("%s=%s", EnvBuildDir, buildDir),
-	)
-
-	return env
+	}
 }
 
 // getTargetTriple generates LLVM target triple based on platform and architecture
@@ -100,7 +97,7 @@ func getBuildFlags(targetTriple string) (cflags, ldflags string) {
 // buildLib builds the library using the appropriate build method
 func (lib *Lib) buildLib(config Config, buildDir string) error {
 	// Get download directory
-	downloadDir := getDownloadDir(*lib)
+	downloadDir := getDownloadDir(lib)
 	if _, err := os.Stat(downloadDir); err != nil {
 		// If download directory doesn't exist, try to create it
 		if os.IsNotExist(err) {
@@ -135,7 +132,8 @@ func (lib *Lib) buildLib(config Config, buildDir string) error {
 		fmt.Printf("  Executing build command\n")
 
 		// Get environment variables
-		env := getBuildEnv(*lib, buildDir, config.Goos, config.Goarch)
+		env := getBuildEnv(lib, buildDir, config.Goos, config.Goarch)
+		lib.Env = env
 
 		// Create the build command
 		cmd := exec.Command("bash", "-c", lib.Config.Build.Command)

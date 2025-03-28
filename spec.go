@@ -66,6 +66,7 @@ type Lib struct {
 	Path    string
 	Sum     string
 	Config  LibSpec
+	Env     []string
 }
 
 type Config struct {

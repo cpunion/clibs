@@ -8,20 +8,20 @@ import (
 	"strings"
 )
 
-func getBuildDirByName(lib Lib, dirName, platform, arch string) string {
+func getBuildDirByName(lib *Lib, dirName, platform, arch string) string {
 	return filepath.Join(getBuildBaseDir(lib), dirName, getTargetTriple(platform, arch))
 }
 
 // getDownloadDir returns the download directory
-func getDownloadDir(lib Lib) string {
+func getDownloadDir(lib *Lib) string {
 	return filepath.Join(getBuildBaseDir(lib), DownloadDirName)
 }
 
-func getPrebuiltDir(lib Lib) string {
+func getPrebuiltDir(lib *Lib) string {
 	return filepath.Join(getBuildBaseDir(lib), PrebuiltDirName)
 }
 
-func getBuildBaseDir(lib Lib) string {
+func getBuildBaseDir(lib *Lib) string {
 	if lib.Sum == "" {
 		return lib.Path
 	}

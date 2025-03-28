@@ -54,7 +54,7 @@ var exportCmd = &cobra.Command{
 
 		// Print the exported variables
 		for _, export := range exports {
-			fmt.Printf("%s=%s\n", export[0], export[1])
+			fmt.Printf("%s\n", export)
 		}
 	},
 }
