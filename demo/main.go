@@ -1,10 +1,10 @@
-package demo
+package main
 
 import (
-	_ "github.com/goplus/clibs/bdwgc"
-	_ "github.com/goplus/clibs/wasi-libc"
+	_ "github.com/cpunion/clibs/wasi-libc/v25"
+	"github.com/goplus/llgo/c"
 )
 
 func main() {
-
+	c.Printf(c.Str("Hello %s\n"), c.Str("world"))
 }

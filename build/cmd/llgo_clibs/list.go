@@ -10,31 +10,31 @@ import (
 
 // listCmd represents the list command
 var listCmd = &cobra.Command{
-	Use:   "list [modules...]",
-	Short: "List C libraries in specified modules",
-	Long:  `List C libraries in specified Go modules based on pkg.yaml configuration.`,
+	Use:   "list [libs...]",
+	Short: "List C libraries in specified libs",
+	Long:  `List C libraries in specified Go libs based on lib.yaml configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Get packages from specified modules or all modules if none specified
-		pkgs, err := build.ListPkgs(args...)
+		// Get libs from specified libs or all libs if none specified
+		libs, err := build.ListLibs(args...)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error listing C library packages: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error listing C libraries: %v\n", err)
 			os.Exit(1)
 		}
 
 		// Display the results
-		if len(pkgs) == 0 {
-			fmt.Println("No C library packages found.")
+		if len(libs) == 0 {
+			fmt.Println("No C libraries found.")
 			return
 		}
 
-		fmt.Printf("Found %d C library package(s):\n", len(pkgs))
-		for _, pkg := range pkgs {
-			fmt.Printf("- %s\n", pkg.Mod)
-			fmt.Printf("  Path: %s\n", pkg.Path)
-			fmt.Printf("  Sum: %s\n", pkg.Sum)
-			fmt.Printf("  Version: %s\n", pkg.Config.Version)
-			if pkg.Config.Git != nil {
-				fmt.Printf("  Git: %s@%s\n", pkg.Config.Git.Repo, pkg.Config.Git.Ref)
+		fmt.Printf("Found %d C libraries:\n", len(libs))
+		for _, lib := range libs {
+			fmt.Printf("- %s\n", lib.ModName)
+			fmt.Printf("  Path: %s\n", lib.Path)
+			fmt.Printf("  Sum: %s\n", lib.Sum)
+			fmt.Printf("  Version: %s\n", lib.Config.Version)
+			if lib.Config.Git != nil {
+				fmt.Printf("  Git: %s@%s\n", lib.Config.Git.Repo, lib.Config.Git.Ref)
 			}
 			fmt.Println()
 		}

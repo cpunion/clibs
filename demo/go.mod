@@ -1,16 +1,10 @@
-module github.com/goplus/clibs/demo
+module github.com/cpunion/clibs/demo
 
-go 1.22
+go 1.20
 
 require (
-	github.com/goplus/clibs/bdwgc v0.0.0-00010101000000-000000000000
-	github.com/goplus/clibs/wasi-libc v0.0.0-00010101000000-000000000000
+	github.com/cpunion/clibs/wasi-libc/v25 v25.0.6
+	github.com/goplus/llgo v0.10.2-0.20250324105426-c968d8ca2e99
 )
 
-require github.com/goplus/llgo v0.10.1 // indirect
-
-replace github.com/goplus/clibs => ../
-
-replace github.com/goplus/clibs/bdwgc => ../bdwgc
-
-replace github.com/goplus/clibs/wasi-libc => ../wasi-libc
+replace github.com/cpunion/clibs/wasi-libc/v25 => ../wasi-libc

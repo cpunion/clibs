@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	LLGoPackage = "link: -L${LLGO_BUILD_DIR}/lib -lgc"
+	LLGoPackage = "link: -L${CLIBS_BUILD_DIR}/lib -lgc"
 )
 
 // -----------------------------------------------------------------------------

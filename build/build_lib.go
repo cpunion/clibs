@@ -8,26 +8,26 @@ import (
 )
 
 // getBuildEnv 准备构建环境变量
-func getBuildEnv(pkg Package, buildDir, platform, arch string) []string {
+func getBuildEnv(lib Lib, buildDir, platform, arch string) []string {
 	// 生成目标三元组
 	targetTriple := getTargetTriple(platform, arch)
 
 	// 生成构建标志
 	cflags, ldflags := getBuildFlags(targetTriple)
 
-	downloadDir := GetDownloadDir(pkg)
+	downloadDir := GetDownloadDir(lib)
 
 	// 创建环境变量
 	env := os.Environ()
 	env = append(env,
-		fmt.Sprintf("CLIBS_PACKAGE_DIR=%s", pkg.Path),
-		fmt.Sprintf("CLIBS_DOWNLOAD_DIR=%s", downloadDir),
-		fmt.Sprintf("CLIBS_BUILD_GOOS=%s", platform),
-		fmt.Sprintf("CLIBS_BUILD_GOARCH=%s", arch),
-		fmt.Sprintf("CLIBS_BUILD_TARGET=%s", targetTriple),
-		fmt.Sprintf("CLIBS_BUILD_CFLAGS=%s", cflags),
-		fmt.Sprintf("CLIBS_BUILD_LDFLAGS=%s", ldflags),
-		fmt.Sprintf("CLIBS_BUILD_DIR=%s", buildDir),
+		fmt.Sprintf("%s=%s", EnvPackageDir, lib.Path),
+		fmt.Sprintf("%s=%s", EnvDownloadDir, downloadDir),
+		fmt.Sprintf("%s=%s", EnvBuildGoos, platform),
+		fmt.Sprintf("%s=%s", EnvBuildGoarch, arch),
+		fmt.Sprintf("%s=%s", EnvBuildTarget, targetTriple),
+		fmt.Sprintf("%s=%s", EnvBuildCflags, cflags),
+		fmt.Sprintf("%s=%s", EnvBuildLdflags, ldflags),
+		fmt.Sprintf("%s=%s", EnvBuildDir, buildDir),
 	)
 
 	return env
@@ -102,9 +102,9 @@ func getBuildFlags(triple string) (cflags string, ldflags string) {
 }
 
 // buildLib builds the library using the appropriate build method
-func (pkg *Package) buildLib(config BuildConfig, buildDir string) error {
+func (lib *Lib) buildLib(config BuildConfig, buildDir string) error {
 	// 获取下载目录
-	downloadDir := GetDownloadDir(*pkg)
+	downloadDir := GetDownloadDir(*lib)
 	if _, err := os.Stat(downloadDir); err != nil {
 		// 如果下载目录不存在，尝试创建它
 		if os.IsNotExist(err) {
@@ -125,14 +125,14 @@ func (pkg *Package) buildLib(config BuildConfig, buildDir string) error {
 	fmt.Printf("  Build directory: %s\n", buildDir)
 
 	// 首先检查配置中是否有构建命令
-	if pkg.Config.Build != nil && pkg.Config.Build.Command != "" {
-		fmt.Printf("  Executing build command: %s\n", pkg.Config.Build.Command)
+	if lib.Config.Build != nil && lib.Config.Build.Command != "" {
+		fmt.Printf("  Executing build command: %s\n", lib.Config.Build.Command)
 
 		// 获取构建环境变量
-		buildEnv := getBuildEnv(*pkg, buildDir, config.Goos, config.Goarch)
+		buildEnv := getBuildEnv(*lib, buildDir, config.Goos, config.Goarch)
 
 		// 对于包含shell特殊字符的命令，使用shell执行
-		cmd := exec.Command("bash", "-c", pkg.Config.Build.Command)
+		cmd := exec.Command("bash", "-c", lib.Config.Build.Command)
 		cmd.Dir = downloadDir
 		cmd.Env = buildEnv
 

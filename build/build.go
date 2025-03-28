@@ -6,7 +6,7 @@ import (
 	"runtime"
 )
 
-func Build(config BuildConfig, packages []Package) error {
+func Build(config BuildConfig, libs []Lib) error {
 	if config.Goos == "" {
 		config.Goos = runtime.GOOS
 	}
@@ -15,21 +15,21 @@ func Build(config BuildConfig, packages []Package) error {
 	}
 
 	// 构建每个包
-	if len(packages) == 0 {
-		fmt.Println("\nBuilding C library packages:")
+	if len(libs) == 0 {
+		fmt.Println("\nBuilding C library libs:")
 	} else {
-		fmt.Println("\nChecking specified modules for pkg.yaml files:")
+		fmt.Println("\nChecking specified libs for lib.yaml files:")
 	}
 
-	for _, pkg := range packages {
-		fmt.Printf("  %#v\n", pkg)
+	for _, lib := range libs {
+		fmt.Printf("  %#v\n", lib)
 		if !config.Force {
 			if !config.Prebuilt {
-				if prebuiltDir, err := pkg.checkPrebuiltStatus(config); err == nil && prebuiltDir != "" {
+				if prebuiltDir, err := lib.checkPrebuiltStatus(config); err == nil && prebuiltDir != "" {
 					continue
 				}
 			}
-			if prebuiltDir, err := pkg.tryDownloadPrebuilt(config); err == nil && prebuiltDir != "" {
+			if prebuiltDir, err := lib.tryDownloadPrebuilt(config); err == nil && prebuiltDir != "" {
 				continue
 			}
 		}
@@ -37,8 +37,8 @@ func Build(config BuildConfig, packages []Package) error {
 		if config.Prebuilt {
 			dirName = PrebuiltDirName
 		}
-		if _, err := pkg.tryBuildPkg(config, dirName); err != nil {
-			fmt.Printf("  Error processing %s: %v\n", pkg.Mod, err)
+		if _, err := lib.tryBuildLib(config, dirName); err != nil {
+			fmt.Printf("  Error processing %s: %v\n", lib.ModName, err)
 			return err
 		}
 	}
@@ -46,13 +46,13 @@ func Build(config BuildConfig, packages []Package) error {
 	return nil
 }
 
-func (pkg *Package) tryDownloadPrebuilt(config BuildConfig) (string, error) {
-	name := pkg.Config.Name
+func (lib *Lib) tryDownloadPrebuilt(config BuildConfig) (string, error) {
+	name := lib.Config.Name
 	target := getTargetTriple(config.Goos, config.Goarch)
-	prebuiltRootDir := GetPrebuiltDir(*pkg)
-	uriEncodedTag := url.PathEscape(fmt.Sprintf("%s/%s", name, pkg.Config.Version))
-	url := fmt.Sprintf("%s/%s/%s-%s-%s.tar.gz", ReleaseUrlPrefix, uriEncodedTag, name, pkg.Config.Version, target)
-	fmt.Printf("  Downloading prebuilt package: %s\n", url)
+	prebuiltRootDir := GetPrebuiltDir(*lib)
+	uriEncodedTag := url.PathEscape(fmt.Sprintf("%s/%s", name, lib.Config.Version))
+	url := fmt.Sprintf("%s/%s/%s-%s-%s.tar.gz", ReleaseUrlPrefix, uriEncodedTag, name, lib.Config.Version, target)
+	fmt.Printf("  Downloading prebuilt lib: %s\n", url)
 	fmt.Printf("    to: %s\n", prebuiltRootDir)
 	if err := fetchFromFiles([]FileSpec{{URL: url}}, prebuiltRootDir, false); err != nil {
 		return "", err
@@ -60,44 +60,44 @@ func (pkg *Package) tryDownloadPrebuilt(config BuildConfig) (string, error) {
 	return prebuiltRootDir, nil
 }
 
-func (pkg *Package) checkPrebuiltStatus(config BuildConfig) (string, error) {
-	prebuiltTargetDir := GetBuildDirByName(*pkg, PrebuiltDirName, config.Goos, config.Goarch)
-	if matched, err := checkHash(prebuiltTargetDir, pkg.Config, true); err != nil || !matched {
-		fmt.Printf("  No prebuilt package found in %s\n", prebuiltTargetDir)
+func (lib *Lib) checkPrebuiltStatus(config BuildConfig) (string, error) {
+	prebuiltTargetDir := GetBuildDirByName(*lib, PrebuiltDirName, config.Goos, config.Goarch)
+	if matched, err := checkHash(prebuiltTargetDir, lib.Config, true); err != nil || !matched {
+		fmt.Printf("  No prebuilt lib  found in %s\n", prebuiltTargetDir)
 		return "", err
 	}
-	fmt.Printf("  Found prebuilt package in %s\n", prebuiltTargetDir)
+	fmt.Printf("  Found prebuilt lib in %s\n", prebuiltTargetDir)
 	return prebuiltTargetDir, nil
 }
 
 // Build the library both build and prebuilt
-func (pkg *Package) tryBuildPkg(config BuildConfig, buildDirName string) (string, error) {
-	buildTargetDir := GetBuildDirByName(*pkg, buildDirName, config.Goos, config.Goarch)
+func (lib *Lib) tryBuildLib(config BuildConfig, buildDirName string) (string, error) {
+	buildTargetDir := GetBuildDirByName(*lib, buildDirName, config.Goos, config.Goarch)
 	if !config.Force {
-		if matched, err := checkHash(buildTargetDir, pkg.Config, true); err == nil && matched {
-			fmt.Printf("  Found build package in %s\n", buildTargetDir)
+		if matched, err := checkHash(buildTargetDir, lib.Config, true); err == nil && matched {
+			fmt.Printf("  Found built lib in %s\n", buildTargetDir)
 			return buildTargetDir, nil
 		}
 	}
-	fmt.Printf("  No build package found in %s\n", buildTargetDir)
+	fmt.Printf("  No built lib found in %s\n", buildTargetDir)
 
-	downloadDir := GetDownloadDir(*pkg)
-	if matched, err := checkHash(downloadDir, pkg.Config, false); err != nil || !matched {
+	downloadDir := GetDownloadDir(*lib)
+	if matched, err := checkHash(downloadDir, lib.Config, false); err != nil || !matched {
 		fmt.Printf("matched: %v, err: %v\n", matched, err)
-		fmt.Printf("  No download package found in %s\n", downloadDir)
-		if err := pkg.fetchLib(); err != nil {
+		fmt.Printf("  No download lib found in %s\n", downloadDir)
+		if err := lib.fetchLib(); err != nil {
 			fmt.Printf("  Error fetching library: %v\n", err)
 			return "", err
 		}
 	}
-	fmt.Printf("  Found download package in %s\n", downloadDir)
+	fmt.Printf("  Found download lib in %s\n", downloadDir)
 
-	if err := pkg.buildLib(config, buildTargetDir); err != nil {
-		fmt.Printf("  Error building library: %v\n", err)
+	if err := lib.buildLib(config, buildTargetDir); err != nil {
+		fmt.Printf("  Error building lib: %v\n", err)
 		return "", err
 	}
 
-	if err := saveHash(buildTargetDir, pkg.Config, true); err != nil {
+	if err := saveHash(buildTargetDir, lib.Config, true); err != nil {
 		fmt.Printf("  Error saving hash: %v\n", err)
 		return "", err
 	}

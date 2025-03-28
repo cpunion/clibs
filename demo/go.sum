@@ -1,2 +1,4 @@
-github.com/goplus/llgo v0.10.1 h1:Cla7Rv6S67SnAknMm8nNvHhxFf9Fo/daHRcs3w3rS6s=
-github.com/goplus/llgo v0.10.1/go.mod h1:YfOHsT/g3lc9b4GclLj812YzdSsJr0kd3CCB830TqHE=
+github.com/cpunion/clibs/wasi-libc/v25 v25.0.6 h1:HUFMwEX2DbS23MnyEY5feRKE0uZJIAmJRe2K8qW4N9M=
+github.com/cpunion/clibs/wasi-libc/v25 v25.0.6/go.mod h1:AIjPRN3Jlz3BsyjfaZvGaAhQ8/Y5vkEeLUbjgo6L7+Q=
+github.com/goplus/llgo v0.10.2-0.20250324105426-c968d8ca2e99 h1:WwYAOYqV9wquT1FoQL2W/NbaIXWsO4po82knBBa5gAQ=
+github.com/goplus/llgo v0.10.2-0.20250324105426-c968d8ca2e99/go.mod h1:YfOHsT/g3lc9b4GclLj812YzdSsJr0kd3CCB830TqHE=

@@ -14,34 +14,34 @@ type ConfigHashInfo struct {
 	Timestamp  int64 `json:"timestamp"`
 }
 
-func GetBuildDirByName(pkg Package, dirName, platform, arch string) string {
-	return filepath.Join(getBuildBaseDir(pkg), dirName, getTargetTriple(platform, arch))
+func GetBuildDirByName(lib Lib, dirName, platform, arch string) string {
+	return filepath.Join(getBuildBaseDir(lib), dirName, getTargetTriple(platform, arch))
 }
 
 // GetDownloadDir returns the download directory
-func GetDownloadDir(pkg Package) string {
-	return filepath.Join(getBuildBaseDir(pkg), DownloadDirName)
+func GetDownloadDir(lib Lib) string {
+	return filepath.Join(getBuildBaseDir(lib), DownloadDirName)
 }
 
-func GetPrebuiltDir(pkg Package) string {
-	return filepath.Join(getBuildBaseDir(pkg), PrebuiltDirName)
+func GetPrebuiltDir(lib Lib) string {
+	return filepath.Join(getBuildBaseDir(lib), PrebuiltDirName)
 }
 
-func getBuildBaseDir(pkg Package) string {
-	if pkg.Sum == "" {
-		return pkg.Path
+func getBuildBaseDir(lib Lib) string {
+	if lib.Sum == "" {
+		return lib.Path
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		panic(err)
 	}
-	subDir := strings.TrimLeft(pkg.Sum, "h1:")
-	return filepath.Join(home, ".llgo/", "clibs_build", pkg.Mod, subDir)
+	subDir := strings.TrimLeft(lib.Sum, "h1:")
+	return filepath.Join(home, ".llgo/", "clibs_build", lib.ModName, subDir)
 }
 
 // checkHash 检查构建哈希是否匹配
-func checkHash(dir string, config PkgSpec, build bool) (bool, error) {
-	var configHash PkgSpec
+func checkHash(dir string, config LibSpec, build bool) (bool, error) {
+	var configHash LibSpec
 	if build {
 		configHash = config.BuildHash()
 	} else {
@@ -66,8 +66,8 @@ func checkHash(dir string, config PkgSpec, build bool) (bool, error) {
 	return hashStr == string(hashContent), nil
 }
 
-func saveHash(dir string, config PkgSpec, build bool) error {
-	var configHash PkgSpec
+func saveHash(dir string, config LibSpec, build bool) error {
+	var configHash LibSpec
 	if build {
 		configHash = config.BuildHash()
 	} else {

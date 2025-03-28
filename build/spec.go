@@ -7,9 +7,21 @@ const (
 	PrebuiltDirName = "_prebuilt"
 	BuildHashFile   = "_llgo_clib_build_config_hash.json"
 
-	PkgConfigFile = "pkg.yaml"
+	LibConfigFile = "lib.yaml"
 
 	ReleaseUrlPrefix = "https://github.com/cpunion/clibs/releases/download"
+)
+
+// Environment variable names used in build scripts
+const (
+	EnvPackageDir   = "CLIBS_PACKAGE_DIR"
+	EnvDownloadDir  = "CLIBS_DOWNLOAD_DIR"
+	EnvBuildGoos    = "CLIBS_BUILD_GOOS"
+	EnvBuildGoarch  = "CLIBS_BUILD_GOARCH"
+	EnvBuildTarget  = "CLIBS_BUILD_TARGET"
+	EnvBuildCflags  = "CLIBS_BUILD_CFLAGS"
+	EnvBuildLdflags = "CLIBS_BUILD_LDFLAGS"
+	EnvBuildDir     = "CLIBS_BUILD_DIR"
 )
 
 type GitSpec struct {
@@ -27,7 +39,7 @@ type BuildSpec struct {
 	Command string `json:"command,omitempty" yaml:"command,omitempty"`
 }
 
-type PkgSpec struct {
+type LibSpec struct {
 	Name    string     `json:"name,omitempty" yaml:"name,omitempty"`
 	Version string     `json:"version,omitempty" yaml:"version,omitempty"`
 	Git     *GitSpec   `json:"git,omitempty" yaml:"git,omitempty"`
@@ -36,24 +48,24 @@ type PkgSpec struct {
 	Export  string     `json:"export,omitempty" yaml:"export,omitempty"`
 }
 
-func (c *PkgSpec) DownloadHash() PkgSpec {
+func (c *LibSpec) DownloadHash() LibSpec {
 	hashConfig := *c
 	hashConfig.Build = nil
 	hashConfig.Export = ""
 	return hashConfig
 }
 
-func (c *PkgSpec) BuildHash() PkgSpec {
+func (c *LibSpec) BuildHash() LibSpec {
 	return *c
 }
 
-// Package represents a package to be built
+// Lib represents a clib to be built
 
-type Package struct {
-	Mod    string
-	Path   string
-	Sum    string
-	Config PkgSpec
+type Lib struct {
+	ModName string
+	Path    string
+	Sum     string
+	Config  LibSpec
 }
 
 type BuildConfig struct {

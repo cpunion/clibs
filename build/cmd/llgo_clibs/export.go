@@ -11,9 +11,9 @@ import (
 
 // exportCmd represents the export command
 var exportCmd = &cobra.Command{
-	Use:   "export [modules...]",
+	Use:   "export [libs...]",
 	Short: "Export environment variables from C libraries",
-	Long:  `Export environment variables from C libraries for specified Go modules based on pkg.yaml configuration.`,
+	Long:  `Export environment variables from C libraries for specified Go libs based on lib.yaml configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		goos := os.Getenv("GOOS")
 		goarch := os.Getenv("GOARCH")
@@ -30,9 +30,9 @@ var exportCmd = &cobra.Command{
 		fmt.Printf("Export: GOOS: %s, GOARCH: %s, Prebuilt: %v\n",
 			goos, goarch, prebuilt)
 
-		pkgs, err := build.ListPkgs(args...)
+		libs, err := build.ListLibs(args...)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error getting C library packages: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error getting C library libs: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -41,7 +41,7 @@ var exportCmd = &cobra.Command{
 			Goarch:   goarch,
 			Prebuilt: prebuilt,
 		}
-		exports, err := build.Export(buildConfig, pkgs)
+		exports, err := build.Export(buildConfig, libs)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)

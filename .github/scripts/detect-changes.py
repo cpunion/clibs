@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-This script detects changes in subdirectories with pkg.yaml files
+This script detects changes in subdirectories with lib.yaml files
 Usage: ./detect-changes.py FROM_REF TO_REF
 """
 
@@ -20,8 +20,8 @@ def run_command(cmd):
         return ""
 
 def check_pkg_name_match(directory):
-    """Check if pkg.yaml name matches directory name"""
-    pkg_yaml_path = os.path.join(directory, "pkg.yaml")
+    """Check if lib.yaml name matches directory name"""
+    pkg_yaml_path = os.path.join(directory, "lib.yaml")
     if os.path.isfile(pkg_yaml_path):
         try:
             with open(pkg_yaml_path, 'r') as f:
@@ -58,7 +58,7 @@ def main():
     print("Changed files:")
     print(changed_files)
 
-    # Initialize set to store changed directories with pkg.yaml
+    # Initialize set to store changed directories with lib.yaml
     changed_dirs = set()
 
     # Process each changed file
@@ -73,23 +73,23 @@ def main():
         if '/' in directory or directory.startswith('.') or directory == "build":
             continue
 
-        # Check if this directory has a pkg.yaml file
-        pkg_yaml_path = os.path.join(directory, "pkg.yaml")
+        # Check if this directory has a lib.yaml file
+        pkg_yaml_path = os.path.join(directory, "lib.yaml")
         if os.path.isfile(pkg_yaml_path):
-            # Check if pkg.yaml name matches directory name
+            # Check if lib.yaml name matches directory name
             if not check_pkg_name_match(directory):
                 sys.exit(1)
 
-            # Check if pkg.yaml itself changed or any file in this directory changed
+            # Check if lib.yaml itself changed or any file in this directory changed
             if file == pkg_yaml_path or file.startswith(f"{directory}/"):
                 # Add to the list if not already there
                 if directory not in changed_dirs:
                     changed_dirs.add(directory)
-                    print(f"Found changed directory with pkg.yaml: {directory}")
+                    print(f"Found changed directory with lib.yaml: {directory}")
 
-    # Check all directories with pkg.yaml files, not just changed ones
+    # Check all directories with lib.yaml files, not just changed ones
     for directory in [d for d in os.listdir('.') if os.path.isdir(d) and not d.startswith('.') and d != 'build']:
-        if os.path.isfile(os.path.join(directory, "pkg.yaml")):
+        if os.path.isfile(os.path.join(directory, "lib.yaml")):
             if not check_pkg_name_match(directory):
                 sys.exit(1)
 
