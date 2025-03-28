@@ -7,17 +7,17 @@ import (
 	"strings"
 )
 
-// getBuildEnv 准备构建环境变量
+// getBuildEnv prepares build environment variables
 func getBuildEnv(lib Lib, buildDir, platform, arch string) []string {
-	// 生成目标三元组
+	// Generate target triple
 	targetTriple := getTargetTriple(platform, arch)
 
-	// 生成构建标志
+	// Generate build flags
 	cflags, ldflags := getBuildFlags(targetTriple)
 
-	downloadDir := GetDownloadDir(lib)
+	downloadDir := getDownloadDir(lib)
 
-	// 创建环境变量
+	// Create environment variables
 	env := os.Environ()
 	env = append(env,
 		fmt.Sprintf("%s=%s", EnvPackageDir, lib.Path),
@@ -33,118 +33,127 @@ func getBuildEnv(lib Lib, buildDir, platform, arch string) []string {
 	return env
 }
 
-// getTargetTriple 根据平台和架构生成LLVM目标三元组
+// getTargetTriple generates LLVM target triple based on platform and architecture
 func getTargetTriple(platform, arch string) string {
-	// 平台映射
+	// Platform mapping
 	platformMap := map[string]string{
 		"darwin":  "apple-darwin",
 		"linux":   "unknown-linux-gnu",
 		"windows": "pc-windows-msvc",
-		"js":      "unknown-emscripten", // WebAssembly (浏览器)
-		"wasi":    "unknown-wasi",       // WebAssembly (非浏览器)
+		"js":      "wasi",   // WebAssembly (browser)
+		"wasip1":  "wasip1", // WebAssembly (non-browser)
 	}
 
-	// 架构映射
+	// Architecture mapping
 	archMap := map[string]string{
-		"amd64":  "x86_64",
-		"386":    "i386",
-		"arm":    "arm",
-		"arm64":  "aarch64",
-		"mips":   "mips",
-		"mips64": "mips64",
-		"wasm":   "wasm32",
+		"amd64":   "x86_64",
+		"386":     "i386",
+		"arm":     "arm",
+		"arm64":   "aarch64",
+		"mips":    "mips",
+		"mips64":  "mips64",
+		"wasm":    "wasm32",
+		"riscv":   "riscv64",
+		"riscv64": "riscv64",
 	}
 
-	// 获取平台和架构的映射值，如果没有则使用原值
+	// Get platform string
 	platformStr, ok := platformMap[platform]
 	if !ok {
-		platformStr = platform
+		platformStr = "unknown-unknown"
 	}
 
+	// Get architecture string
 	archStr, ok := archMap[arch]
 	if !ok {
 		archStr = arch
 	}
 
-	// 特殊情况处理
+	// Special case for WebAssembly
 	if platform == "js" || platform == "wasi" {
-		// 对于WebAssembly，使用wasm32-unknown-emscripten或wasm32-unknown-wasi
 		return fmt.Sprintf("wasm32-%s", platformStr)
 	}
 
-	// 生成三元组
 	return fmt.Sprintf("%s-%s", archStr, platformStr)
 }
 
-// getBuildFlags 根据目标三元组生成CFLAGS和LDFLAGS
-func getBuildFlags(triple string) (cflags string, ldflags string) {
-	// 基本标志
+// getBuildFlags generates build flags based on target triple
+func getBuildFlags(targetTriple string) (cflags, ldflags string) {
+	// Default flags
 	cflags = "-O2"
 	ldflags = ""
 
-	// 根据三元组添加特定标志
-	if strings.Contains(triple, "wasm32") {
-		// WebAssembly特定标志
-		cflags = fmt.Sprintf("%s -D__WASM__ -flto", cflags)
-		ldflags = "-flto"
-	} else if strings.Contains(triple, "windows") {
-		// Windows特定标志
-		cflags = fmt.Sprintf("%s -D_WIN32", cflags)
-	} else if strings.Contains(triple, "darwin") {
-		// macOS特定标志
-		cflags = fmt.Sprintf("%s -D__APPLE__", cflags)
-	} else if strings.Contains(triple, "linux") {
-		// Linux特定标志
-		cflags = fmt.Sprintf("%s -D__linux__", cflags)
+	// Add target-specific flags
+	if strings.Contains(targetTriple, "wasm32") {
+		cflags += " -D__wasm__"
+	} else if strings.Contains(targetTriple, "windows") {
+		cflags += " -D_WIN32"
+	} else if strings.Contains(targetTriple, "darwin") {
+		cflags += " -D__APPLE__"
+	} else if strings.Contains(targetTriple, "linux") {
+		cflags += " -D__linux__"
 	}
 
-	return cflags, ldflags
+	return
 }
 
 // buildLib builds the library using the appropriate build method
-func (lib *Lib) buildLib(config BuildConfig, buildDir string) error {
-	// 获取下载目录
-	downloadDir := GetDownloadDir(*lib)
+func (lib *Lib) buildLib(config Config, buildDir string) error {
+	// Get download directory
+	downloadDir := getDownloadDir(*lib)
 	if _, err := os.Stat(downloadDir); err != nil {
-		// 如果下载目录不存在，尝试创建它
+		// If download directory doesn't exist, try to create it
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(downloadDir, 0755); err != nil {
 				return fmt.Errorf("failed to create download directory: %v", err)
 			}
-			// 目录创建成功，但因为没有下载内容，返回错误提示需要先获取源码
-			return fmt.Errorf("download directory created but empty, please fetch library source first")
+		} else {
+			return fmt.Errorf("failed to check download directory: %v", err)
 		}
-		return fmt.Errorf("download directory access error: %v", err)
 	}
 
-	// 确保构建目录存在
+	// Create build directory if it doesn't exist
 	if err := os.MkdirAll(buildDir, 0755); err != nil {
 		return fmt.Errorf("failed to create build directory: %v", err)
 	}
 
 	fmt.Printf("  Build directory: %s\n", buildDir)
 
-	// 首先检查配置中是否有构建命令
-	if lib.Config.Build != nil && lib.Config.Build.Command != "" {
-		fmt.Printf("  Executing build command: %s\n", lib.Config.Build.Command)
-
-		// 获取构建环境变量
-		buildEnv := getBuildEnv(*lib, buildDir, config.Goos, config.Goarch)
-
-		// 对于包含shell特殊字符的命令，使用shell执行
-		cmd := exec.Command("bash", "-c", lib.Config.Build.Command)
-		cmd.Dir = downloadDir
-		cmd.Env = buildEnv
-
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("  Build command error: %s\n", output)
-			return fmt.Errorf("build command failed: %v - %s", err, output)
+	// Check if we need to download files
+	if lib.Config.Git != nil {
+		// TODO: Implement Git checkout
+		return fmt.Errorf("git checkout not implemented yet")
+	} else if len(lib.Config.Files) > 0 {
+		// Download files
+		if err := lib.fetchLib(); err != nil {
+			return fmt.Errorf("failed to fetch library: %v", err)
 		}
-
-		fmt.Printf("  Build command output:\n%s\n", output)
-		return nil
 	}
 
-	return fmt.Errorf("no build command specified in configuration")
+	// If there's a build command, execute it
+	if lib.Config.Build != nil && lib.Config.Build.Command != "" {
+		fmt.Printf("  Executing build command\n")
+
+		// Get environment variables
+		env := getBuildEnv(*lib, buildDir, config.Goos, config.Goarch)
+
+		// Create the build command
+		cmd := exec.Command("bash", "-c", lib.Config.Build.Command)
+		cmd.Dir = downloadDir
+		cmd.Env = env
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		// Execute the build command
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("build command failed: %v", err)
+		}
+	}
+
+	// Write hash file to mark successful build
+	if err := saveHash(buildDir, lib.Config, true); err != nil {
+		return fmt.Errorf("failed to write hash file: %v", err)
+	}
+
+	return nil
 }

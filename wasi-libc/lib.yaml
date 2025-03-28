@@ -1,5 +1,5 @@
 name: wasi-libc
-version: v25.0.7
+version: v25.0.8
 
 files:
   - url: https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/libclang_rt.builtins-wasm32-wasi-25.0.tar.gz
@@ -14,7 +14,7 @@ build:
 
 export: |
   if [ "$CLIBS_BUILD_GOARCH" = "wasm" ]; then
-    echo "CLIBS_GLOBAL_CCFLAGS=--sysroot=$CLIBS_BUILD_DIR/sysroot"
-    echo "CLIBS_GLOBAL_CXXFLAGS=--sysroot=$CLIBS_BUILD_DIR/sysroot"
-    echo "CLIBS_GLOBAL_WASI_SYSROOT=$CLIBS_BUILD_DIR/sysroot"
+    echo "CCFLAGS=--sysroot=$CLIBS_BUILD_DIR/sysroot"
+    echo "CXXFLAGS=--sysroot=$CLIBS_BUILD_DIR/sysroot"
+    echo "CLIBS_WASI_SYSROOT=$CLIBS_BUILD_DIR/sysroot"
   fi
