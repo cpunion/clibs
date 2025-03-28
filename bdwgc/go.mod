@@ -1,4 +1,4 @@
-module github.com/goplus/clibs/bdwgc
+module github.com/cpunion/clibs/bdwgc
 
 go 1.20
 
