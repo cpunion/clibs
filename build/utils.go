@@ -33,7 +33,7 @@ func getBuildBaseDir(lib Lib) string {
 	return filepath.Join(home, ".llgo/", "clibs_build", lib.ModName, subDir)
 }
 
-// checkHash 检查构建哈希是否匹配
+// checkHash verifies if the build hash matches
 func checkHash(dir string, config LibSpec, build bool) (bool, error) {
 	var configHash LibSpec
 	if build {
@@ -42,7 +42,6 @@ func checkHash(dir string, config LibSpec, build bool) (bool, error) {
 		configHash = config.DownloadHash()
 	}
 
-	// 检查构建哈希文件
 	hashContent, err := os.ReadFile(filepath.Join(dir, BuildHashFile))
 	if err != nil {
 		fmt.Printf("read hash file failed: %v, %s", err, filepath.Join(dir, BuildHashFile))
@@ -55,7 +54,6 @@ func checkHash(dir string, config LibSpec, build bool) (bool, error) {
 	}
 	hashStr := string(hash)
 
-	// 比较哈希值
 	fmt.Printf("  Checking hash, equal: %v, %s, %s\n", hashStr == string(hashContent), hashStr, string(hashContent))
 	return hashStr == string(hashContent), nil
 }
@@ -68,13 +66,11 @@ func saveHash(dir string, config LibSpec, build bool) error {
 		configHash = config.DownloadHash()
 	}
 
-	// 序列化为JSON
 	content, err := json.MarshalIndent(configHash, "", "  ")
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("  Saving hash: %#v\n     to %s\n", configHash, filepath.Join(dir, BuildHashFile))
-	// 写入哈希文件
 	return os.WriteFile(filepath.Join(dir, BuildHashFile), content, 0644)
 }

@@ -1,6 +1,7 @@
 package build
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -49,12 +50,22 @@ func listMods(patterns []string) ([]string, error) {
 	fmt.Printf("Executing: go list -json -deps %s\n", strings.Join(patterns, " "))
 	args := append([]string{"list", "-json", "-deps"}, patterns...)
 	cmd := exec.Command("go", args...)
-	out, err := cmd.Output()
+
+	// Capture both stdout and stderr
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
 	if err != nil {
+		// Print stderr if available
+		if stderr.Len() > 0 {
+			fmt.Printf("Error output: %s\n", stderr.String())
+		}
 		return nil, fmt.Errorf("failed to list specified packages: %v", err)
 	}
 
-	return parseJSON(out)
+	return parseJSON(stdout.Bytes())
 }
 
 // parseJSON parses module paths from JSON output
@@ -108,14 +119,24 @@ func findLibs(mods []string) ([]Lib, error) {
 func processLib(mod string) (Lib, bool, error) {
 	// Get detailed module info including Sum field
 	cmd := exec.Command("go", "list", "-m", "-json", mod)
-	out, err := cmd.Output()
+
+	// Capture both stdout and stderr
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
 	if err != nil {
+		// Print stderr if available
+		if stderr.Len() > 0 {
+			fmt.Printf("Error output for module %s: %s\n", mod, stderr.String())
+		}
 		return Lib{}, false, fmt.Errorf("error finding module info: %v", err)
 	}
 
 	// Parse module info
 	var info libInfo
-	if err := json.Unmarshal(out, &info); err != nil {
+	if err := json.Unmarshal(stdout.Bytes(), &info); err != nil {
 		return Lib{}, false, fmt.Errorf("error parsing module info: %v", err)
 	}
 

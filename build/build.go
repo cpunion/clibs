@@ -14,7 +14,6 @@ func Build(config Config, libs []Lib) error {
 		config.Goarch = runtime.GOARCH
 	}
 
-	// 构建每个包
 	if len(libs) == 0 {
 		fmt.Println("\nBuilding C library libs:")
 	} else {
