@@ -87,7 +87,6 @@ jobs:
           go-version: 1.24
 
       - name: Install llgo_clibs
-        working-directory: build
         run: go install ./cmd/llgo_clibs
 
       - name: Build lib ${{ matrix.lib }}

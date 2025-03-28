@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cpunion/clibs/build"
+	"github.com/cpunion/clibs"
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +15,7 @@ var listCmd = &cobra.Command{
 	Long:  `List C libraries in specified Go libs based on lib.yaml configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Get libs from specified libs or all libs if none specified
-		libs, err := build.ListLibs(args...)
+		libs, err := clibs.ListLibs(args...)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error listing C libraries: %v\n", err)
 			os.Exit(1)
