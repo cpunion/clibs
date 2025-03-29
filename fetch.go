@@ -187,8 +187,6 @@ func fetchFromFiles(files []FileSpec, downloadDir string, clean bool) error {
 
 		// Process archive files if extraction is not disabled
 		if !file.NoExtract && (strings.HasSuffix(filename, ".tar.gz") || strings.HasSuffix(filename, ".tgz")) {
-			fmt.Printf("  Extracting: %s\n", filename)
-
 			// Determine extraction directory
 			extractDir := downloadDir
 			if file.ExtractDir != "" {
@@ -198,6 +196,7 @@ func fetchFromFiles(files []FileSpec, downloadDir string, clean bool) error {
 				}
 			}
 
+			fmt.Printf("  Extracting: %s into %s\n", filename, extractDir)
 			// Extract archive
 			cmd := exec.Command("tar", "-xzf", finalFilePath, "-C", extractDir)
 			output, err := cmd.CombinedOutput()
