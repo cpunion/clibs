@@ -23,14 +23,10 @@ func (p *Lib) Export(config Config) (exports []string, err error) {
 	if p.Config.Export == "" {
 		return nil, nil
 	}
-
-	buildDir := getBuildDirByName(p, BuildDirName, config.Goos, config.Goarch)
-	buildEnv := getBuildEnv(p, buildDir, config.Goos, config.Goarch)
-
 	// Execute the export command using bash
 	cmd := exec.Command("bash", "-c", p.Config.Export)
 	cmd.Dir = p.Path
-	cmd.Env = buildEnv
+	cmd.Env = p.Env
 
 	output, err := cmd.Output()
 	if err != nil {
