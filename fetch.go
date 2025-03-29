@@ -136,6 +136,10 @@ func fetchFromFiles(files []FileSpec, downloadDir string, clean bool) error {
 		}
 	}
 
+	if err := os.MkdirAll(downloadDir, 0755); err != nil {
+		return err
+	}
+
 	// Download and process each file
 	for i, file := range files {
 		if file.URL == "" {
