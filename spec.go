@@ -75,4 +75,5 @@ type Config struct {
 	Prebuilt bool
 	Force    bool
 	Verbose  bool
+	Tags     []string
 }
