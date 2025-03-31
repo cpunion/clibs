@@ -33,22 +33,23 @@ type pkgInfo struct {
 }
 
 // ListLibs gets all C libraries from the current project dependencies
-func ListLibs(patterns ...string) ([]*Lib, error) {
+func ListLibs(tags []string, patterns ...string) ([]*Lib, error) {
 	// Get module paths
-	mods, err := listMods(patterns)
+	mods, err := listMods(tags, patterns)
 	if err != nil {
 		return nil, err
 	}
 
 	// Process modules to find lib.yaml files
-	return findLibs(mods)
+	return findLibs(tags, mods)
 }
 
 // listMods gets modules from specified package patterns
-func listMods(patterns []string) ([]string, error) {
+func listMods(tags []string, patterns []string) ([]string, error) {
 	// Use go list -json -deps to get package info and all dependencies
-	fmt.Printf("Executing: go list -json -deps %s\n", strings.Join(patterns, " "))
-	args := append([]string{"list", "-json", "-deps"}, patterns...)
+	args := append([]string{"list", "-json", "-deps"}, tags...)
+	args = append(args, patterns...)
+	fmt.Printf("Executing: go %s\n", strings.Join(args, " "))
 	cmd := exec.Command("go", args...)
 
 	// Capture both stdout and stderr
@@ -97,11 +98,11 @@ func parseJSON(data []byte) ([]string, error) {
 }
 
 // findLibs processes modules to find lib.yaml files
-func findLibs(mods []string) ([]*Lib, error) {
+func findLibs(tags []string, mods []string) ([]*Lib, error) {
 	var libs []*Lib
 
 	for _, mod := range mods {
-		lib, found, err := processLib(mod)
+		lib, found, err := processLib(tags, mod)
 		if err != nil {
 			fmt.Printf("Error processing module %s: %v\n", mod, err)
 			continue
@@ -116,9 +117,9 @@ func findLibs(mods []string) ([]*Lib, error) {
 }
 
 // processLib processes a single module to find lib.yaml
-func processLib(mod string) (*Lib, bool, error) {
+func processLib(tags []string, mod string) (*Lib, bool, error) {
 	// Get detailed module info including Sum field
-	cmd := exec.Command("go", "list", "-m", "-json", mod)
+	cmd := exec.Command("go", append(append([]string{"list", "-m", "-json"}, tags...), mod)...)
 
 	// Capture both stdout and stderr
 	var stdout, stderr bytes.Buffer
