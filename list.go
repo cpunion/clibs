@@ -33,6 +33,7 @@ type pkgInfo struct {
 }
 
 // ListLibs gets all C libraries from the current project dependencies
+// tags: e.g. []string{"-tags", "linux,amd64"}
 func ListLibs(tags []string, patterns ...string) ([]*Lib, error) {
 	// Get module paths
 	mods, err := listMods(tags, patterns)
