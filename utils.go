@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-func getBuildDirByName(lib *Lib, dirName, platform, arch string) string {
-	return filepath.Join(getBuildBaseDir(lib), dirName, getTargetTriple(platform, arch))
+func getBuildDirByName(lib *Lib, dirName, platform, arch, targetTriple string) string {
+	return filepath.Join(getBuildBaseDir(lib), dirName, targetTriple)
 }
 
 // getDownloadDir returns the download directory

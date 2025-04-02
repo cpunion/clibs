@@ -4,7 +4,7 @@ set -e
 
 CURDIR=$(pwd)
 
-cd $(dirname "$0")/build
+cd $(dirname "$0")
 
 go install ./cmd/llgo_clibs
 

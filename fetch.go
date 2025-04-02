@@ -42,8 +42,6 @@ func (p *Lib) fetchLib() error {
 	} else if len(p.Config.Files) > 0 {
 		fmt.Printf("  Fetching from files\n")
 		fetchErr = fetchFromFiles(p.Config.Files, downloadTmpDir, true)
-	} else {
-		fetchErr = fmt.Errorf("no valid fetch configuration found")
 	}
 
 	// If download fails, clean temporary directory and return error

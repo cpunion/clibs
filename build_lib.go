@@ -4,14 +4,64 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 )
 
-// getBuildEnv prepares build environment variables
-func getBuildEnv(lib *Lib, buildDir, platform, arch string) []string {
-	// Generate target triple
-	targetTriple := getTargetTriple(platform, arch)
+func getTargetTriple(goos, goarch string) string {
+	var llvmarch string
+	if goarch == "" {
+		goarch = runtime.GOARCH
+	}
+	if goos == "" {
+		goos = runtime.GOOS
+	}
+	switch goarch {
+	case "386":
+		llvmarch = "i386"
+	case "amd64":
+		llvmarch = "x86_64"
+	case "arm64":
+		llvmarch = "aarch64"
+	case "arm":
+		switch goarch {
+		case "5":
+			llvmarch = "armv5"
+		case "6":
+			llvmarch = "armv6"
+		default:
+			llvmarch = "armv7"
+		}
+	case "wasm":
+		llvmarch = "wasm32"
+	default:
+		llvmarch = goarch
+	}
+	llvmvendor := "unknown"
+	llvmos := goos
+	switch goos {
+	case "darwin":
+		// Use macosx* instead of darwin, otherwise darwin/arm64 will refer
+		// to iOS!
+		llvmos = "macosx10.12.0"
+		if llvmarch == "aarch64" {
+			// Looks like Apple prefers to call this architecture ARM64
+			// instead of AArch64.
+			llvmarch = "arm64"
+			llvmos = "macosx11.0.0"
+		}
+		llvmvendor = "apple"
+	case "wasip1":
+		llvmos = "wasip1"
+	}
+	// Target triples (which actually have four components, but are called
+	// triples for historical reasons) have the form:
+	//   arch-vendor-os-environment
+	return llvmarch + "-" + llvmvendor + "-" + llvmos
+}
 
+// getBuildEnv prepares build environment variables
+func getBuildEnv(lib *Lib, buildDir, platform, arch, targetTriple string) []string {
 	// Generate build flags
 	cflags, ldflags := getBuildFlags(targetTriple)
 
@@ -28,50 +78,6 @@ func getBuildEnv(lib *Lib, buildDir, platform, arch string) []string {
 		fmt.Sprintf("%s=%s", EnvBuildLdflags, ldflags),
 		fmt.Sprintf("%s=%s", EnvBuildDir, buildDir),
 	}
-}
-
-// getTargetTriple generates LLVM target triple based on platform and architecture
-func getTargetTriple(platform, arch string) string {
-	// Platform mapping
-	platformMap := map[string]string{
-		"darwin":  "apple-darwin",
-		"linux":   "unknown-linux-gnu",
-		"windows": "pc-windows-msvc",
-		"js":      "wasi",   // WebAssembly (browser)
-		"wasip1":  "wasip1", // WebAssembly (non-browser)
-	}
-
-	// Architecture mapping
-	archMap := map[string]string{
-		"amd64":   "x86_64",
-		"386":     "i386",
-		"arm":     "arm",
-		"arm64":   "aarch64",
-		"mips":    "mips",
-		"mips64":  "mips64",
-		"wasm":    "wasm32",
-		"riscv":   "riscv64",
-		"riscv64": "riscv64",
-	}
-
-	// Get platform string
-	platformStr, ok := platformMap[platform]
-	if !ok {
-		platformStr = "unknown-unknown"
-	}
-
-	// Get architecture string
-	archStr, ok := archMap[arch]
-	if !ok {
-		archStr = arch
-	}
-
-	// Special case for WebAssembly
-	if platform == "js" || platform == "wasi" {
-		return fmt.Sprintf("wasm32-%s", platformStr)
-	}
-
-	return fmt.Sprintf("%s-%s", archStr, platformStr)
 }
 
 // getBuildFlags generates build flags based on target triple
@@ -129,16 +135,18 @@ func (lib *Lib) buildLib(config Config, buildDir string) error {
 
 	// If there's a build command, execute it
 	if lib.Config.Build != nil && lib.Config.Build.Command != "" {
-		fmt.Printf("  Executing build command\n")
+		fmt.Printf("  Executing build command:\n%s\n", lib.Config.Build.Command)
 
 		// Get environment variables
-		env := getBuildEnv(lib, buildDir, config.Goos, config.Goarch)
+		targetTriple := getTargetTriple(config.Goos, config.Goarch)
+		env := getBuildEnv(lib, buildDir, config.Goos, config.Goarch, targetTriple)
 		lib.Env = env
 
+		fmt.Printf("  Environment variables:\n%s\n", strings.Join(append(os.Environ(), env...), "\n"))
 		// Create the build command
-		cmd := exec.Command("bash", "-c", lib.Config.Build.Command)
+		cmd := exec.Command("bash", "-e", "-c", lib.Config.Build.Command)
 		cmd.Dir = downloadDir
-		cmd.Env = env
+		cmd.Env = append(os.Environ(), env...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
