@@ -1,0 +1,29 @@
+name: wasi-sdk
+version: v25.0.0
+
+build:
+  command: |
+    env
+    if [ "$CLIBS_BUILD_GOARCH" != "wasm" ]; then
+      exit 0
+    fi
+
+    wget -P $CLIBS_DOWNLOAD_DIR -c https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sysroot-25.0.tar.gz
+    wget -P $CLIBS_DOWNLOAD_DIR -c https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/libclang_rt.builtins-wasm32-wasi-25.0.tar.gz
+
+    rm -rf "$CLIBS_BUILD_DIR/libclang"
+    mkdir -p $CLIBS_BUILD_DIR/libclang/lib/wasm32-unknown-wasip1
+    tar -zxf $CLIBS_DOWNLOAD_DIR/libclang_rt.builtins-wasm32-wasi-25.0.tar.gz -C $CLIBS_DOWNLOAD_DIR
+    cp $CLIBS_DOWNLOAD_DIR/libclang_rt.builtins-wasm32-wasi-25.0/libclang_rt.builtins-wasm32.a $CLIBS_BUILD_DIR/libclang/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a
+
+    rm -rf "$CLIBS_BUILD_DIR/sysroot"
+    tar -zxf $CLIBS_DOWNLOAD_DIR/wasi-sysroot-25.0.tar.gz -C $CLIBS_DOWNLOAD_DIR/
+    mv $CLIBS_DOWNLOAD_DIR/wasi-sysroot-25.0 $CLIBS_BUILD_DIR/sysroot
+
+export: |
+  if [ "$CLIBS_BUILD_GOARCH" = "wasm" ]; then
+    echo "CCFLAGS=--sysroot=$CLIBS_BUILD_DIR/sysroot -resource-dir=$CLIBS_BUILD_DIR/libclang/"
+    echo "CXXFLAGS=--sysroot=$CLIBS_BUILD_DIR/sysroot"
+    echo "CFLAGS=-I$CLIBS_BUILD_DIR/sysroot/include/$CLIBS_BUILD_TARGET"
+    echo "CLIBS_WASI_SYSROOT=$CLIBS_BUILD_DIR/sysroot"
+  fi
