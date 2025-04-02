@@ -24,7 +24,7 @@ func (p *Lib) Export(config Config) (exports []string, err error) {
 		return nil, nil
 	}
 	// Execute the export command using bash
-	cmd := exec.Command("bash", "-c", p.Config.Export)
+	cmd := exec.Command("bash", "-e", "-c", p.Config.Export)
 	cmd.Dir = p.Path
 	cmd.Env = p.Env
 

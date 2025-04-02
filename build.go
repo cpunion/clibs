@@ -20,61 +20,75 @@ func Build(config Config, libs []*Lib) error {
 		fmt.Println("\nChecking specified libs for lib.yaml files:")
 	}
 
+	targetTriple := getTargetTriple(config.Goos, config.Goarch)
 	for _, lib := range libs {
 		fmt.Printf("  %#v\n", lib)
-		if !config.Force {
-			if !config.Prebuilt {
-				if prebuiltDir, err := lib.checkPrebuiltStatus(config); err == nil && prebuiltDir != "" {
-					continue
-				}
-			}
-			if prebuiltDir, err := lib.tryDownloadPrebuilt(config); err == nil && prebuiltDir != "" {
-				continue
-			}
-		}
-		dirName := BuildDirName
-		if config.Prebuilt {
-			dirName = PrebuiltDirName
-		}
-		if _, err := lib.tryBuildLib(config, dirName); err != nil {
+		buildDir, err := lib.checkOrBuild(config)
+		if err != nil {
 			fmt.Printf("  Error processing %s: %v\n", lib.ModName, err)
 			return err
 		}
+		lib.Env = getBuildEnv(lib, buildDir, config.Goos, config.Goarch, targetTriple)
 	}
 
 	return nil
 }
 
+func (lib *Lib) checkOrBuild(config Config) (dir string, err error) {
+	if !config.Force && lib.Sum != "" {
+		if !config.Prebuilt {
+			if prebuiltDir, err := lib.checkPrebuiltStatus(config); err == nil && prebuiltDir != "" {
+				return prebuiltDir, nil
+			}
+		}
+		if prebuiltDir, err := lib.tryDownloadPrebuilt(config); err == nil && prebuiltDir != "" {
+			return prebuiltDir, nil
+		}
+	}
+	dirName := BuildDirName
+	if config.Prebuilt {
+		dirName = PrebuiltDirName
+	}
+	buildDir, err := lib.tryBuildLib(config, dirName)
+	if err != nil {
+		fmt.Printf("  Error processing %s: %v\n", lib.ModName, err)
+		return "", err
+	}
+	return buildDir, nil
+}
+
 func (lib *Lib) tryDownloadPrebuilt(config Config) (string, error) {
 	name := lib.Config.Name
-	target := getTargetTriple(config.Goos, config.Goarch)
+	targetTriple := getTargetTriple(config.Goos, config.Goarch)
 	prebuiltRootDir := getPrebuiltDir(lib)
 	uriEncodedTag := url.PathEscape(fmt.Sprintf("%s/%s", name, lib.Config.Version))
-	url := fmt.Sprintf("%s/%s/%s-%s-%s.tar.gz", ReleaseUrlPrefix, uriEncodedTag, name, lib.Config.Version, target)
+	url := fmt.Sprintf("%s/%s/%s-%s-%s.tar.gz", ReleaseUrlPrefix, uriEncodedTag, name, lib.Config.Version, targetTriple)
 	fmt.Printf("  Downloading prebuilt lib: %s\n", url)
 	fmt.Printf("    to: %s\n", prebuiltRootDir)
 	if err := fetchFromFiles([]FileSpec{{URL: url}}, prebuiltRootDir, false); err != nil {
 		return "", err
 	}
-	prebuiltTargetDir := getBuildDirByName(lib, PrebuiltDirName, config.Goos, config.Goarch)
-	lib.Env = getBuildEnv(lib, prebuiltTargetDir, config.Goos, config.Goarch)
+	prebuiltTargetDir := getBuildDirByName(lib, PrebuiltDirName, config.Goos, config.Goarch, targetTriple)
+	lib.Env = getBuildEnv(lib, prebuiltTargetDir, config.Goos, config.Goarch, targetTriple)
 	return prebuiltTargetDir, nil
 }
 
 func (lib *Lib) checkPrebuiltStatus(config Config) (string, error) {
-	prebuiltTargetDir := getBuildDirByName(lib, PrebuiltDirName, config.Goos, config.Goarch)
+	targetTriple := getTargetTriple(config.Goos, config.Goarch)
+	prebuiltTargetDir := getBuildDirByName(lib, PrebuiltDirName, config.Goos, config.Goarch, targetTriple)
 	if matched, err := checkHash(prebuiltTargetDir, lib.Config, true); err != nil || !matched {
 		fmt.Printf("  No prebuilt lib  found in %s\n", prebuiltTargetDir)
 		return "", err
 	}
 	fmt.Printf("  Found prebuilt lib in %s\n", prebuiltTargetDir)
-	lib.Env = getBuildEnv(lib, prebuiltTargetDir, config.Goos, config.Goarch)
+	lib.Env = getBuildEnv(lib, prebuiltTargetDir, config.Goos, config.Goarch, targetTriple)
 	return prebuiltTargetDir, nil
 }
 
 // Build the library both build and prebuilt
 func (lib *Lib) tryBuildLib(config Config, buildDirName string) (string, error) {
-	buildTargetDir := getBuildDirByName(lib, buildDirName, config.Goos, config.Goarch)
+	targetTriple := getTargetTriple(config.Goos, config.Goarch)
+	buildTargetDir := getBuildDirByName(lib, buildDirName, config.Goos, config.Goarch, targetTriple)
 	if !config.Force {
 		if matched, err := checkHash(buildTargetDir, lib.Config, true); err == nil && matched {
 			fmt.Printf("  Found built lib in %s\n", buildTargetDir)
